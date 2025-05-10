@@ -105,7 +105,7 @@ The text formatting is done by inline codes. You can get more information from [
 ## Usage
 
 ```bash
-npm install @mlightcad/libredwg-web
+npm install @mlightcad/mtext-parser
 ```
 
 Here's how to use the MText parser in your TypeScript/JavaScript project:
