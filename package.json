@@ -1,0 +1,36 @@
+{
+  "name": "@mlightcad/mtext-parser",
+  "version": "1.0.0",
+  "description": "AutoCAD MText parser written in TypeScript",
+  "main": "dist/mtext-parser.js",
+  "types": "dist/mtext-parser.d.ts",
+  "type": "module",
+  "author": "MLight Lee <mlight.lee@outlook.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mlight-lee/mtext-parser"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "example": "npm run build && node src/example.js",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\""
+  },
+  "keywords": [
+    "autocad",
+    "dxf",
+    "mtext",
+    "parser"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.11.24",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.3.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
