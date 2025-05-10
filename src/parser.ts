@@ -25,6 +25,22 @@ export enum TokenType {
 }
 
 /**
+ * Type for token data based on token type
+ */
+export type TokenData = {
+  [TokenType.NONE]: null;
+  [TokenType.WORD]: string;
+  [TokenType.STACK]: [string, string, string];
+  [TokenType.SPACE]: null;
+  [TokenType.NBSP]: null;
+  [TokenType.TABULATOR]: null;
+  [TokenType.NEW_PARAGRAPH]: null;
+  [TokenType.NEW_COLUMN]: null;
+  [TokenType.WRAP_AT_DIMLINE]: null;
+  [TokenType.PROPERTIES_CHANGED]: string;
+};
+
+/**
  * Line alignment options for MText
  */
 export enum MTextLineAlignment {
@@ -681,13 +697,15 @@ export class MTextParser {
           break;
         case 'x': // Skip
           break;
-        case 'q': // Alignment
+        case 'q': {
+          // Alignment
           const adjustment = scanner.get();
           align = CHAR_TO_ALIGN[adjustment] || MTextParagraphAlignment.DEFAULT;
           while (scanner.peek() === ',') {
             scanner.consume(1);
           }
           break;
+        }
         case 't': // Tab stops
           tabStops = [];
           while (scanner.hasData) {
@@ -732,24 +750,28 @@ export class MTextParser {
    * @yields MTextToken objects
    */
   *parse(): Generator<MTextToken> {
-    let wordToken = TokenType.WORD;
-    let spaceToken = TokenType.SPACE;
+    const wordToken = TokenType.WORD;
+    const spaceToken = TokenType.SPACE;
     let followupToken: TokenType | null = null;
 
-    const wordAndToken = (word: string, token: TokenType): [TokenType, string] => {
-      if (word) {
-        followupToken = token;
-        return [wordToken, word];
-      }
-      return [token, ''];
-    };
-
-    const nextToken = (): [TokenType, any] => {
+    const nextToken = (): [TokenType, TokenData[TokenType]] => {
       let word = '';
       while (this.scanner.hasData) {
         let escape = false;
         let letter = this.scanner.peek();
         const cmdStartIndex = this.scanner.currentIndex;
+
+        // Handle control characters first
+        if (letter.charCodeAt(0) < 32) {
+          this.scanner.consume(1); // Always consume the control character
+          if (letter === '\t') {
+            return [TokenType.TABULATOR, null];
+          }
+          if (letter === '\n') {
+            return [TokenType.NEW_PARAGRAPH, null];
+          }
+          letter = ' ';
+        }
 
         if (letter === '\\') {
           if ('\\{}'.includes(this.scanner.peek(1))) {
@@ -786,7 +808,10 @@ export class MTextParser {
                     // After processing a property command, continue with normal parsing
                     continue;
                   } catch (e) {
-                    const commandText = this.scanner.tail.slice(cmdStartIndex, this.scanner.currentIndex);
+                    const commandText = this.scanner.tail.slice(
+                      cmdStartIndex,
+                      this.scanner.currentIndex
+                    );
                     word += commandText;
                   }
                 }
@@ -795,15 +820,7 @@ export class MTextParser {
           }
         }
 
-        if (letter.charCodeAt(0) < 32) {
-          if (letter === '\t') {
-            return wordAndToken(word, TokenType.TABULATOR);
-          }
-          if (letter === '\n') {
-            return wordAndToken(word, TokenType.NEW_PARAGRAPH);
-          }
-          letter = ' ';
-        } else if (letter === '%' && this.scanner.peek(1) === '%') {
+        if (letter === '%' && this.scanner.peek(1) === '%') {
           const code = this.scanner.peek(2).toLowerCase();
           const specialChar = SPECIAL_CHAR_ENCODING[code];
           if (specialChar) {
@@ -1154,6 +1171,6 @@ export class MTextToken {
   constructor(
     public type: TokenType,
     public ctx: MTextContext,
-    public data: any = null
+    public data: TokenData[TokenType]
   ) {}
 }

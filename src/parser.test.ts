@@ -1,11 +1,9 @@
 import {
   MTextParser,
   MTextContext,
-  MTextToken,
   TokenType,
   MTextLineAlignment,
   MTextParagraphAlignment,
-  MTextStroke,
   rgb2int,
   int2rgb,
   caretDecode,
@@ -199,6 +197,42 @@ describe('MTextParser', () => {
       expect(tokens[1].type).toBe(TokenType.SPACE);
       expect(tokens[2].type).toBe(TokenType.WORD);
       expect(tokens[2].data).toBe('World');
+    });
+
+    it('parses text starting with control characters', () => {
+      // Test with newline
+      let parser = new MTextParser('\nHello World');
+      let tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.NEW_PARAGRAPH);
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Hello');
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('World');
+
+      // Test with tab
+      parser = new MTextParser('\tHello World');
+      tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.TABULATOR);
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Hello');
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('World');
+
+      // Test with multiple control characters
+      parser = new MTextParser('\n\tHello World');
+      tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0].type).toBe(TokenType.NEW_PARAGRAPH);
+      expect(tokens[1].type).toBe(TokenType.TABULATOR);
+      expect(tokens[2].type).toBe(TokenType.WORD);
+      expect(tokens[2].data).toBe('Hello');
+      expect(tokens[3].type).toBe(TokenType.SPACE);
+      expect(tokens[4].type).toBe(TokenType.WORD);
+      expect(tokens[4].data).toBe('World');
     });
 
     it('parses new paragraphs', () => {
