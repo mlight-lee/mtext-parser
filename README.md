@@ -18,6 +18,12 @@ The text formatting is done by inline codes. You can get more information from [
 - “%%d” and “%%D” renders “°” (alt-0176)
 - “%%p” and “%%P” renders “±” (alt-0177)
 
+### Multi-byte character encoding commands "\M" and "\m":
+- Format: "\M+XXXX" or "\m+XXXX" where XXXX is a 4-character hex code
+- Example: "\M+C4E3" renders the GBK encoded character
+- If no valid hex code is found after "+", the command is treated as literal text
+- Currently supports GBK encoding, with plans to add BIG5 support
+
 ### Alignment command “\A”: argument “0”, “1” or “2” is expected
 - the terminator symbol “;” is optional
 - the arguments “3”, “4”, “5”, “6”, “7”, “8”, “9” and “-” default to 0

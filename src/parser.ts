@@ -264,6 +264,7 @@ export class MTextParser {
   private ctxStack: MTextContext[] = [];
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
+  private decoder: TextDecoder;
 
   /**
    * Creates a new MTextParser instance
@@ -273,8 +274,27 @@ export class MTextParser {
    */
   constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
     this.scanner = new TextScanner(caretDecode(content));
-    this.ctx = ctx || new MTextContext();
+    this.ctx = ctx ?? new MTextContext();
     this.yieldPropertyCommands = yieldPropertyCommands;
+    this.decoder = new TextDecoder('gbk');
+  }
+
+  /**
+   * Decode multi-byte character from hex code
+   * @param hex - Hex code string (e.g. "C4E3")
+   * @returns Decoded character or empty square if invalid
+   */
+  private decodeMultiByteChar(hex: string): string {
+    try {
+      const bytes = new Uint8Array([
+        parseInt(hex.substr(0, 2), 16),
+        parseInt(hex.substr(2, 2), 16),
+      ]);
+      // TODO: handle BIG5 encoding too
+      return this.decoder.decode(bytes);
+    } catch {
+      return '▯';
+    }
   }
 
   /**
@@ -453,7 +473,7 @@ export class MTextParser {
         } else {
           ctx.capHeight = Math.abs(parseFloat(expr));
         }
-      } catch (e) {
+      } catch {
         // If parsing fails, treat the entire command as literal text
         this.scanner.consume(-expr.length); // Rewind to before the expression
         return;
@@ -476,7 +496,7 @@ export class MTextParser {
         } else {
           ctx.widthFactor = Math.abs(parseFloat(expr));
         }
-      } catch (e) {
+      } catch {
         // If parsing fails, treat the entire command as literal text
         this.scanner.consume(-expr.length); // Rewind to before the expression
         return;
@@ -499,7 +519,7 @@ export class MTextParser {
         } else {
           ctx.charTrackingFactor = Math.abs(parseFloat(expr));
         }
-      } catch (e) {
+      } catch {
         // If parsing fails, treat the entire command as literal text
         this.scanner.consume(-expr.length); // Rewind to before the expression
         return;
@@ -795,6 +815,26 @@ export class MTextParser {
                 return [TokenType.WRAP_AT_DIMLINE, null];
               case 'S':
                 return this.parseStacking();
+              case 'm':
+              case 'M':
+                // Handle multi-byte character encoding
+                if (this.scanner.peek() === '+') {
+                  this.scanner.consume(1); // Consume the '+'
+                  const hexCode = this.scanner.tail.match(/^[0-9A-Fa-f]{4}/)?.[0];
+                  if (hexCode) {
+                    this.scanner.consume(4);
+                    const decodedChar = this.decodeMultiByteChar(hexCode);
+                    if (word) {
+                      return [wordToken, word];
+                    }
+                    return [wordToken, decodedChar];
+                  }
+                  // If no valid hex code found, rewind the '+' character
+                  this.scanner.consume(-1);
+                }
+                // If not a valid multi-byte code, treat as literal text
+                word += '\\M';
+                continue;
               default:
                 if (cmd) {
                   try {
@@ -807,7 +847,7 @@ export class MTextParser {
                     }
                     // After processing a property command, continue with normal parsing
                     continue;
-                  } catch (e) {
+                  } catch {
                     const commandText = this.scanner.tail.slice(
                       cmdStartIndex,
                       this.scanner.currentIndex
@@ -946,8 +986,7 @@ export class TextScanner {
    * @param count - Number of characters to advance
    */
   consume(count: number = 1): void {
-    if (count < 1) throw new Error(`Invalid consume count: ${count}`);
-    this._index = Math.min(this._index + count, this.textLen);
+    this._index = Math.max(0, Math.min(this._index + count, this.textLen));
   }
 
   /**
@@ -956,9 +995,8 @@ export class TextScanner {
    * @returns The character at the offset position, or empty string if out of bounds
    */
   peek(offset: number = 0): string {
-    if (offset < 0) throw new Error(`Invalid peek offset: ${offset}`);
     const index = this._index + offset;
-    if (index >= this.textLen) {
+    if (index >= this.textLen || index < 0) {
       return '';
     }
     return this.text[index];
