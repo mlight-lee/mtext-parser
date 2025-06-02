@@ -678,6 +678,86 @@ describe('MTextParser', () => {
     });
   });
 
+  describe('GBK character encoding', () => {
+    it('decodes GBK hex codes', () => {
+      // Test "你" (C4E3 in GBK)
+      let parser = new MTextParser('\\M+C4E3', undefined, false);
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('你');
+
+      // Test "好" (BAC3 in GBK)
+      parser = new MTextParser('\\M+BAC3', undefined, false);
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('好');
+
+      // Test multiple GBK characters
+      parser = new MTextParser('\\M+C4E3\\M+BAC3', undefined, false);
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('你');
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('好');
+    });
+
+    it('handles invalid GBK codes', () => {
+      // Test invalid hex code
+      let parser = new MTextParser('\\M+XXXX', undefined, false);
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('\\M+XXXX');
+
+      // Test incomplete hex code
+      parser = new MTextParser('\\M+C4', undefined, false);
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('\\M+C4');
+
+      // Test missing plus sign
+      parser = new MTextParser('\\MC4E3', undefined, false);
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('\\MC4E3');
+    });
+
+    it('handles GBK characters with other formatting', () => {
+      // Test GBK characters with height command
+      const parser = new MTextParser('\\H2.5;\\M+C4E3\\H.5x;\\M+BAC3', undefined, false);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(2);
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('你');
+      expect(tokens[0].ctx.capHeight).toBe(2.5);
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('好');
+      expect(tokens[1].ctx.capHeight).toBe(0.5);
+    });
+
+    it('handles GBK characters with font properties', () => {
+      const parser = new MTextParser(
+        '{\\fgbcbig.shx|b0|i0|c0|p0;\\M+C4E3\\M+BAC3}',
+        undefined,
+        false
+      );
+      const tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toBe('你');
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('好');
+      expect(tokens[0].ctx.fontFace).toEqual({
+        family: 'gbcbig.shx',
+        style: 'Regular',
+        weight: 400,
+      });
+      expect(tokens[1].ctx.fontFace).toEqual({
+        family: 'gbcbig.shx',
+        style: 'Regular',
+        weight: 400,
+      });
+    });
+  });
+
   describe('stacking', () => {
     it('parses basic fractions with different dividers', () => {
       let parser = new MTextParser('\\S1/2;');
