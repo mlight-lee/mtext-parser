@@ -91,8 +91,10 @@ function processTokens(parser: MTextParser, title: string) {
     const contextProps = {
       font: ctx.fontFace.family ? ctx.fontFace : undefined,
       color: ctx.rgb ? `RGB(${ctx.rgb.join(',')})` : ctx.aci !== 7 ? `ACI(${ctx.aci})` : undefined,
-      height: ctx.capHeight !== 1.0 ? ctx.capHeight : undefined,
-      width: ctx.widthFactor !== 1.0 ? ctx.widthFactor : undefined,
+      height:
+        ctx.capHeight !== 1.0 ? `${ctx.capHeight}${ctx.isHeightRelative ? 'x' : ''}` : undefined,
+      width:
+        ctx.widthFactor !== 1.0 ? `${ctx.widthFactor}${ctx.isWidthRelative ? 'x' : ''}` : undefined,
       tracking: ctx.charTrackingFactor !== 1.0 ? ctx.charTrackingFactor : undefined,
       oblique: ctx.oblique !== 0.0 ? ctx.oblique : undefined,
       underline: ctx.underline ? true : undefined,
@@ -129,8 +131,8 @@ processTokens(new MTextParser(complexExample), 'Complex Formatting with Context'
 
 // Example of using custom context
 const customContext = new MTextContext();
-customContext.capHeight = 2.0;
-customContext.widthFactor = 1.5;
+customContext.capHeight = { value: 2.0, isRelative: false };
+customContext.widthFactor = { value: 1.5, isRelative: true };
 customContext.fontFace = { family: 'Times New Roman', style: 'Italic', weight: 400 };
 
 const customParser = new MTextParser('Text with custom context', customContext);
