@@ -867,6 +867,238 @@ describe('MTextParser', () => {
       expect(tokens[0].ctx.paragraph.align).toBe(MTextParagraphAlignment.CENTER);
     });
   });
+
+  describe('property commands with yieldPropertyCommands', () => {
+    it('yields property change tokens for formatting commands', () => {
+      const parser = new MTextParser('\\LUnderlined\\l', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(3);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'L',
+        changes: {
+          underline: true,
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Underlined');
+      expect(tokens[1].ctx.underline).toBe(true);
+      expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[2].data).toEqual({
+        command: 'l',
+        changes: {
+          underline: false,
+        },
+      });
+      expect(tokens[2].ctx.underline).toBe(false);
+    });
+
+    it('yields property change tokens for color commands', () => {
+      const parser = new MTextParser('\\C1Red Text', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'C',
+        changes: {
+          aci: 1,
+          rgb: null,
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Red');
+      expect(tokens[1].ctx.aci).toBe(1);
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[2].ctx.aci).toBe(1);
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Text');
+      expect(tokens[3].ctx.aci).toBe(1);
+    });
+
+    it('yields property change tokens for font properties', () => {
+      const parser = new MTextParser('\\FArial|b1|i1;Bold Italic', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'F',
+        changes: {
+          fontFace: {
+            family: 'Arial',
+            style: 'Italic',
+            weight: 700,
+          },
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Bold');
+      expect(tokens[1].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[2].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Italic');
+      expect(tokens[3].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+    });
+
+    it('yields property change tokens for height command', () => {
+      const parser = new MTextParser('\\H2.5;Text', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(2);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'H',
+        changes: {
+          capHeight: 2.5,
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Text');
+      expect(tokens[1].ctx.capHeight).toBe(2.5);
+    });
+
+    it('yields property change tokens for multiple commands', () => {
+      const parser = new MTextParser('\\H2.5;\\C1;\\LText\\l', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'H',
+        changes: {
+          capHeight: 2.5,
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[1].data).toEqual({
+        command: 'C',
+        changes: {
+          aci: 1,
+          rgb: null,
+        },
+      });
+      expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[2].data).toEqual({
+        command: 'L',
+        changes: {
+          underline: true,
+        },
+      });
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Text');
+      expect(tokens[3].ctx.capHeight).toBe(2.5);
+      expect(tokens[3].ctx.aci).toBe(1);
+      expect(tokens[3].ctx.underline).toBe(true);
+      expect(tokens[4].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[4].data).toEqual({
+        command: 'l',
+        changes: {
+          underline: false,
+        },
+      });
+    });
+
+    it('yields property change tokens for paragraph properties', () => {
+      const parser = new MTextParser('\\pi2;\\pqc;Indented Centered', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'p',
+        changes: {
+          paragraph: {
+            indent: 2,
+          },
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[1].data).toEqual({
+        command: 'p',
+        changes: {
+          paragraph: {
+            align: MTextParagraphAlignment.CENTER,
+          },
+        },
+      });
+      expect(tokens[2].type).toBe(TokenType.WORD);
+      expect(tokens[2].data).toBe('Indented');
+      expect(tokens[2].ctx.paragraph.indent).toBe(2);
+      expect(tokens[2].ctx.paragraph.align).toBe(MTextParagraphAlignment.CENTER);
+      expect(tokens[3].type).toBe(TokenType.SPACE);
+      expect(tokens[3].ctx.paragraph.align).toBe(MTextParagraphAlignment.CENTER);
+      expect(tokens[4].type).toBe(TokenType.WORD);
+      expect(tokens[4].data).toBe('Centered');
+      expect(tokens[4].ctx.paragraph.align).toBe(MTextParagraphAlignment.CENTER);
+    });
+
+    it('yields property change tokens for complex formatting', () => {
+      const parser = new MTextParser(
+        '{\\H2.5;\\C1;\\FArial|b1|i1;Formatted Text}',
+        undefined,
+        true
+      );
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(6);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'H',
+        changes: {
+          capHeight: 2.5,
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[1].data).toEqual({
+        command: 'C',
+        changes: {
+          aci: 1,
+          rgb: null,
+        },
+      });
+      expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[2].data).toEqual({
+        command: 'F',
+        changes: {
+          fontFace: {
+            family: 'Arial',
+            style: 'Italic',
+            weight: 700,
+          },
+        },
+      });
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Formatted');
+      expect(tokens[3].ctx.capHeight).toBe(2.5);
+      expect(tokens[3].ctx.aci).toBe(1);
+      expect(tokens[3].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+      expect(tokens[4].type).toBe(TokenType.SPACE);
+      expect(tokens[4].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+      expect(tokens[5].type).toBe(TokenType.WORD);
+      expect(tokens[5].data).toBe('Text');
+      expect(tokens[5].ctx.fontFace).toEqual({
+        family: 'Arial',
+        style: 'Italic',
+        weight: 700,
+      });
+    });
+  });
 });
 
 describe('TextScanner', () => {

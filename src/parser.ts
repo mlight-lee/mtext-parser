@@ -37,7 +37,23 @@ export type TokenData = {
   [TokenType.NEW_PARAGRAPH]: null;
   [TokenType.NEW_COLUMN]: null;
   [TokenType.WRAP_AT_DIMLINE]: null;
-  [TokenType.PROPERTIES_CHANGED]: string;
+  [TokenType.PROPERTIES_CHANGED]: {
+    command: string;
+    changes: {
+      underline?: boolean;
+      overline?: boolean;
+      strikeThrough?: boolean;
+      aci?: number;
+      rgb?: RGB | null;
+      align?: MTextLineAlignment;
+      fontFace?: FontFace;
+      capHeight?: number;
+      widthFactor?: number;
+      charTrackingFactor?: number;
+      oblique?: number;
+      paragraph?: Partial<ParagraphProperties>;
+    };
+  };
 };
 
 /**
@@ -265,6 +281,7 @@ export class MTextParser {
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
   private decoder: TextDecoder;
+  private lastCtx: MTextContext;
 
   /**
    * Creates a new MTextParser instance
@@ -275,6 +292,7 @@ export class MTextParser {
   constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
     this.scanner = new TextScanner(caretDecode(content));
     this.ctx = ctx ?? new MTextContext();
+    this.lastCtx = this.ctx.copy();
     this.yieldPropertyCommands = yieldPropertyCommands;
     this.decoder = new TextDecoder('gbk');
   }
@@ -374,8 +392,9 @@ export class MTextParser {
   /**
    * Parse MText properties
    * @param cmd - The property command to parse
+   * @returns Property changes if yieldPropertyCommands is true and changes occurred
    */
-  private parseProperties(cmd: string): void {
+  private parseProperties(cmd: string): TokenData[TokenType.PROPERTIES_CHANGED] | void {
     const newCtx = this.ctx.copy();
 
     switch (cmd) {
@@ -443,6 +462,91 @@ export class MTextParser {
 
     newCtx.continueStroke = this.continueStroke;
     this.ctx = newCtx;
+
+    if (this.yieldPropertyCommands) {
+      const changes = this.getPropertyChanges(this.lastCtx, newCtx);
+      if (Object.keys(changes).length > 0) {
+        this.lastCtx = this.ctx.copy();
+        return {
+          command: cmd,
+          changes,
+        };
+      }
+    }
+  }
+
+  /**
+   * Get property changes between two contexts
+   * @param oldCtx - The old context
+   * @param newCtx - The new context
+   * @returns Object containing changed properties
+   */
+  private getPropertyChanges(
+    oldCtx: MTextContext,
+    newCtx: MTextContext
+  ): TokenData[TokenType.PROPERTIES_CHANGED]['changes'] {
+    const changes: TokenData[TokenType.PROPERTIES_CHANGED]['changes'] = {};
+
+    if (oldCtx.underline !== newCtx.underline) {
+      changes.underline = newCtx.underline;
+    }
+    if (oldCtx.overline !== newCtx.overline) {
+      changes.overline = newCtx.overline;
+    }
+    if (oldCtx.strikeThrough !== newCtx.strikeThrough) {
+      changes.strikeThrough = newCtx.strikeThrough;
+    }
+    if (oldCtx.aci !== newCtx.aci) {
+      changes.aci = newCtx.aci;
+      changes.rgb = newCtx.rgb; // Always include rgb when aci changes
+    }
+    if (oldCtx.rgb !== newCtx.rgb) {
+      changes.rgb = newCtx.rgb;
+    }
+    if (oldCtx.align !== newCtx.align) {
+      changes.align = newCtx.align;
+    }
+    if (JSON.stringify(oldCtx.fontFace) !== JSON.stringify(newCtx.fontFace)) {
+      changes.fontFace = newCtx.fontFace;
+    }
+    if (oldCtx.capHeight !== newCtx.capHeight) {
+      changes.capHeight = newCtx.capHeight;
+    }
+    if (oldCtx.widthFactor !== newCtx.widthFactor) {
+      changes.widthFactor = newCtx.widthFactor;
+    }
+    if (oldCtx.charTrackingFactor !== newCtx.charTrackingFactor) {
+      changes.charTrackingFactor = newCtx.charTrackingFactor;
+    }
+    if (oldCtx.oblique !== newCtx.oblique) {
+      changes.oblique = newCtx.oblique;
+    }
+    if (JSON.stringify(oldCtx.paragraph) !== JSON.stringify(newCtx.paragraph)) {
+      // Only include changed paragraph properties
+      const changedProps: Partial<ParagraphProperties> = {};
+      if (oldCtx.paragraph.indent !== newCtx.paragraph.indent) {
+        changedProps.indent = newCtx.paragraph.indent;
+      }
+      if (oldCtx.paragraph.align !== newCtx.paragraph.align) {
+        changedProps.align = newCtx.paragraph.align;
+      }
+      if (oldCtx.paragraph.left !== newCtx.paragraph.left) {
+        changedProps.left = newCtx.paragraph.left;
+      }
+      if (oldCtx.paragraph.right !== newCtx.paragraph.right) {
+        changedProps.right = newCtx.paragraph.right;
+      }
+      if (
+        JSON.stringify(oldCtx.paragraph.tab_stops) !== JSON.stringify(newCtx.paragraph.tab_stops)
+      ) {
+        changedProps.tab_stops = newCtx.paragraph.tab_stops;
+      }
+      if (Object.keys(changedProps).length > 0) {
+        changes.paragraph = changedProps;
+      }
+    }
+
+    return changes;
   }
 
   /**
@@ -838,12 +942,10 @@ export class MTextParser {
               default:
                 if (cmd) {
                   try {
-                    this.parseProperties(cmd);
-                    if (this.yieldPropertyCommands) {
-                      return [
-                        TokenType.PROPERTIES_CHANGED,
-                        this.scanner.tail.slice(cmdStartIndex, this.scanner.currentIndex),
-                      ];
+                    const propertyChanges = this.parseProperties(cmd);
+                    if (this.yieldPropertyCommands && propertyChanges) {
+                      this.lastCtx = this.ctx.copy();
+                      return [TokenType.PROPERTIES_CHANGED, propertyChanges];
                     }
                     // After processing a property command, continue with normal parsing
                     continue;
