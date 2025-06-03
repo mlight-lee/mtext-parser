@@ -36,7 +36,9 @@ export interface Properties {
   align?: MTextLineAlignment;
   fontFace?: FontFace;
   capHeight?: number;
+  isHeightRelative?: boolean;
   widthFactor?: number;
+  isWidthRelative?: boolean;
   charTrackingFactor?: number;
   oblique?: number;
   paragraph?: Partial<ParagraphProperties>;
@@ -519,11 +521,19 @@ export class MTextParser {
     if (JSON.stringify(oldCtx.fontFace) !== JSON.stringify(newCtx.fontFace)) {
       changes.fontFace = newCtx.fontFace;
     }
-    if (oldCtx.capHeight !== newCtx.capHeight) {
+    if (
+      oldCtx.capHeight !== newCtx.capHeight ||
+      oldCtx.isHeightRelative !== newCtx.isHeightRelative
+    ) {
       changes.capHeight = newCtx.capHeight;
+      changes.isHeightRelative = newCtx.isHeightRelative;
     }
-    if (oldCtx.widthFactor !== newCtx.widthFactor) {
+    if (
+      oldCtx.widthFactor !== newCtx.widthFactor ||
+      oldCtx.isWidthRelative !== newCtx.isWidthRelative
+    ) {
       changes.widthFactor = newCtx.widthFactor;
+      changes.isWidthRelative = newCtx.isWidthRelative;
     }
     if (oldCtx.charTrackingFactor !== newCtx.charTrackingFactor) {
       changes.charTrackingFactor = newCtx.charTrackingFactor;
@@ -582,10 +592,16 @@ export class MTextParser {
     if (expr) {
       try {
         if (expr.endsWith('x')) {
-          // For height command, treat x suffix as absolute value
-          ctx.capHeight = Math.abs(parseFloat(expr.slice(0, -1)));
+          // For height command, treat x suffix as relative value
+          ctx.capHeight = {
+            value: parseFloat(expr.slice(0, -1)),
+            isRelative: true,
+          };
         } else {
-          ctx.capHeight = Math.abs(parseFloat(expr));
+          ctx.capHeight = {
+            value: parseFloat(expr),
+            isRelative: false,
+          };
         }
       } catch {
         // If parsing fails, treat the entire command as literal text
@@ -605,10 +621,16 @@ export class MTextParser {
     if (expr) {
       try {
         if (expr.endsWith('x')) {
-          // For width command, treat x suffix as absolute value
-          ctx.widthFactor = Math.abs(parseFloat(expr.slice(0, -1)));
+          // For width command, treat x suffix as relative value
+          ctx.widthFactor = {
+            value: parseFloat(expr.slice(0, -1)),
+            isRelative: true,
+          };
         } else {
-          ctx.widthFactor = Math.abs(parseFloat(expr));
+          ctx.widthFactor = {
+            value: parseFloat(expr),
+            isRelative: false,
+          };
         }
       } catch {
         // If parsing fails, treat the entire command as literal text
@@ -1184,10 +1206,14 @@ export class MTextContext {
   align: MTextLineAlignment = MTextLineAlignment.BOTTOM;
   /** Font face properties */
   fontFace: FontFace = { family: '', style: 'Regular', weight: 400 };
-  /** Capital letter height */
-  capHeight: number = 1.0;
-  /** Character width factor */
-  widthFactor: number = 1.0;
+  /** Capital letter height (absolute value) */
+  private _capHeight: number = 1.0;
+  /** Whether height is relative */
+  private _isHeightRelative: boolean = false;
+  /** Character width factor (absolute value) */
+  private _widthFactor: number = 1.0;
+  /** Whether width is relative */
+  private _isWidthRelative: boolean = false;
   /** Character tracking factor */
   charTrackingFactor: number = 1.0;
   /** Oblique angle */
@@ -1200,6 +1226,54 @@ export class MTextContext {
     align: MTextParagraphAlignment.DEFAULT,
     tab_stops: [],
   };
+
+  /**
+   * Get the capital letter height
+   */
+  get capHeight(): number {
+    return this._capHeight;
+  }
+
+  /**
+   * Set the capital letter height
+   * @param value - Height value
+   * @param isRelative - Whether the value is relative
+   */
+  set capHeight(value: { value: number; isRelative: boolean }) {
+    this._capHeight = Math.abs(value.value);
+    this._isHeightRelative = value.isRelative;
+  }
+
+  /**
+   * Get whether height is relative
+   */
+  get isHeightRelative(): boolean {
+    return this._isHeightRelative;
+  }
+
+  /**
+   * Get the character width factor
+   */
+  get widthFactor(): number {
+    return this._widthFactor;
+  }
+
+  /**
+   * Set the character width factor
+   * @param value - Width factor value
+   * @param isRelative - Whether the value is relative
+   */
+  set widthFactor(value: { value: number; isRelative: boolean }) {
+    this._widthFactor = Math.abs(value.value);
+    this._isWidthRelative = value.isRelative;
+  }
+
+  /**
+   * Get whether width is relative
+   */
+  get isWidthRelative(): boolean {
+    return this._isWidthRelative;
+  }
 
   /**
    * Get the ACI color value
@@ -1299,8 +1373,10 @@ export class MTextContext {
     ctx.rgb = this.rgb;
     ctx.align = this.align;
     ctx.fontFace = { ...this.fontFace };
-    ctx.capHeight = this.capHeight;
-    ctx.widthFactor = this.widthFactor;
+    ctx._capHeight = this._capHeight;
+    ctx._isHeightRelative = this._isHeightRelative;
+    ctx._widthFactor = this._widthFactor;
+    ctx._isWidthRelative = this._isWidthRelative;
     ctx.charTrackingFactor = this.charTrackingFactor;
     ctx.oblique = this.oblique;
     ctx.paragraph = { ...this.paragraph };

@@ -289,6 +289,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
 
       it('parses relative height values with x suffix', () => {
@@ -297,6 +298,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
       });
 
       it('handles optional terminator', () => {
@@ -305,6 +307,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
 
       it('handles leading signs', () => {
@@ -313,12 +316,14 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(2.5); // Negative values are ignored
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H+2.5;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
 
       it('handles decimal values without leading zero', () => {
@@ -327,18 +332,21 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
 
         parser = new MTextParser('\\H-.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.5); // Negative values are ignored
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
 
         parser = new MTextParser('\\H+.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
       });
 
       it('handles exponential notation', () => {
@@ -347,24 +355,28 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(100);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H1e-2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.01);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H.5e2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(50);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H.5e-2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.005);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
 
       it('handles invalid floating point values', () => {
@@ -373,18 +385,21 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('.5;Text');
         expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H1e;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('e;Text');
         expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
 
         parser = new MTextParser('\\H1e+;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('e+;Text');
         expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
 
       it('handles complex height expressions', () => {
@@ -393,12 +408,14 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(0.15);
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
 
         parser = new MTextParser('\\H-.5e+2x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(50); // Negative values are ignored
+        expect(tokens[0].ctx.isHeightRelative).toBe(true);
       });
 
       it('handles multiple height commands', () => {
@@ -407,9 +424,11 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('First');
         expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('Second');
         expect(tokens[1].ctx.capHeight).toBe(0.5);
+        expect(tokens[1].ctx.isHeightRelative).toBe(true);
       });
 
       it('handles height command with no value', () => {
@@ -418,6 +437,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
+        expect(tokens[0].ctx.isHeightRelative).toBe(false);
       });
     });
 
@@ -428,6 +448,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(2.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(false);
       });
 
       it('parses relative width values with x suffix', () => {
@@ -436,6 +457,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(2.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(true);
       });
 
       it('handles optional terminator', () => {
@@ -444,6 +466,7 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(2.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(false);
       });
 
       it('handles leading signs', () => {
@@ -452,12 +475,14 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(2.5); // Negative values are ignored
+        expect(tokens[0].ctx.isWidthRelative).toBe(false);
 
         parser = new MTextParser('\\W+2.5;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(2.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(false);
       });
 
       it('handles decimal values without leading zero', () => {
@@ -466,12 +491,14 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(0.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(true);
 
         parser = new MTextParser('\\W-.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
         expect(tokens[0].ctx.widthFactor).toBe(0.5); // Negative values are ignored
+        expect(tokens[0].ctx.isWidthRelative).toBe(true);
       });
 
       it('handles multiple width commands', () => {
@@ -480,9 +507,11 @@ describe('MTextParser', () => {
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('First');
         expect(tokens[0].ctx.widthFactor).toBe(2.5);
+        expect(tokens[0].ctx.isWidthRelative).toBe(false);
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('Second');
         expect(tokens[1].ctx.widthFactor).toBe(0.5);
+        expect(tokens[1].ctx.isWidthRelative).toBe(true);
       });
     });
 
@@ -961,6 +990,7 @@ describe('MTextParser', () => {
         command: 'H',
         changes: {
           capHeight: 2.5,
+          isHeightRelative: false,
         },
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
@@ -977,6 +1007,7 @@ describe('MTextParser', () => {
         command: 'H',
         changes: {
           capHeight: 2.5,
+          isHeightRelative: false,
         },
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1054,6 +1085,7 @@ describe('MTextParser', () => {
         command: 'H',
         changes: {
           capHeight: 2.5,
+          isHeightRelative: false,
         },
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
