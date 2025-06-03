@@ -25,6 +25,32 @@ export enum TokenType {
 }
 
 /**
+ * Format properties of MText word tokens
+ */
+export interface Properties {
+  underline?: boolean;
+  overline?: boolean;
+  strikeThrough?: boolean;
+  aci?: number;
+  rgb?: RGB | null;
+  align?: MTextLineAlignment;
+  fontFace?: FontFace;
+  capHeight?: number;
+  widthFactor?: number;
+  charTrackingFactor?: number;
+  oblique?: number;
+  paragraph?: Partial<ParagraphProperties>;
+}
+
+/**
+ * Changed properties of MText word tokens
+ */
+export interface ChangedProperties {
+  command: string;
+  changes: Properties;
+}
+
+/**
  * Type for token data based on token type
  */
 export type TokenData = {
@@ -37,23 +63,7 @@ export type TokenData = {
   [TokenType.NEW_PARAGRAPH]: null;
   [TokenType.NEW_COLUMN]: null;
   [TokenType.WRAP_AT_DIMLINE]: null;
-  [TokenType.PROPERTIES_CHANGED]: {
-    command: string;
-    changes: {
-      underline?: boolean;
-      overline?: boolean;
-      strikeThrough?: boolean;
-      aci?: number;
-      rgb?: RGB | null;
-      align?: MTextLineAlignment;
-      fontFace?: FontFace;
-      capHeight?: number;
-      widthFactor?: number;
-      charTrackingFactor?: number;
-      oblique?: number;
-      paragraph?: Partial<ParagraphProperties>;
-    };
-  };
+  [TokenType.PROPERTIES_CHANGED]: ChangedProperties;
 };
 
 /**
