@@ -24,6 +24,11 @@ export enum TokenType {
   PROPERTIES_CHANGED = 9,
 }
 
+export interface FactorValue {
+  value: number;
+  isRelative: boolean;
+}
+
 /**
  * Format properties of MText word tokens
  */
@@ -35,11 +40,9 @@ export interface Properties {
   rgb?: RGB | null;
   align?: MTextLineAlignment;
   fontFace?: FontFace;
-  capHeight?: number;
-  isHeightRelative?: boolean;
-  widthFactor?: number;
-  isWidthRelative?: boolean;
-  charTrackingFactor?: number;
+  capHeight?: FactorValue;
+  widthFactor?: FactorValue;
+  charTrackingFactor?: FactorValue;
   oblique?: number;
   paragraph?: Partial<ParagraphProperties>;
 }
@@ -522,20 +525,21 @@ export class MTextParser {
       changes.fontFace = newCtx.fontFace;
     }
     if (
-      oldCtx.capHeight !== newCtx.capHeight ||
-      oldCtx.isHeightRelative !== newCtx.isHeightRelative
+      oldCtx.capHeight.value !== newCtx.capHeight.value ||
+      oldCtx.capHeight.isRelative !== newCtx.capHeight.isRelative
     ) {
       changes.capHeight = newCtx.capHeight;
-      changes.isHeightRelative = newCtx.isHeightRelative;
     }
     if (
-      oldCtx.widthFactor !== newCtx.widthFactor ||
-      oldCtx.isWidthRelative !== newCtx.isWidthRelative
+      oldCtx.widthFactor.value !== newCtx.widthFactor.value ||
+      oldCtx.widthFactor.isRelative !== newCtx.widthFactor.isRelative
     ) {
       changes.widthFactor = newCtx.widthFactor;
-      changes.isWidthRelative = newCtx.isWidthRelative;
     }
-    if (oldCtx.charTrackingFactor !== newCtx.charTrackingFactor) {
+    if (
+      oldCtx.charTrackingFactor.value !== newCtx.charTrackingFactor.value ||
+      oldCtx.charTrackingFactor.isRelative !== newCtx.charTrackingFactor.isRelative
+    ) {
       changes.charTrackingFactor = newCtx.charTrackingFactor;
     }
     if (oldCtx.oblique !== newCtx.oblique) {
@@ -650,10 +654,16 @@ export class MTextParser {
     if (expr) {
       try {
         if (expr.endsWith('x')) {
-          // For tracking command, treat x suffix as absolute value
-          ctx.charTrackingFactor = Math.abs(parseFloat(expr.slice(0, -1)));
+          // For tracking command, treat x suffix as relative value
+          ctx.charTrackingFactor = {
+            value: Math.abs(parseFloat(expr.slice(0, -1))),
+            isRelative: true,
+          };
         } else {
-          ctx.charTrackingFactor = Math.abs(parseFloat(expr));
+          ctx.charTrackingFactor = {
+            value: Math.abs(parseFloat(expr)),
+            isRelative: false,
+          };
         }
       } catch {
         // If parsing fails, treat the entire command as literal text
@@ -1206,16 +1216,17 @@ export class MTextContext {
   align: MTextLineAlignment = MTextLineAlignment.BOTTOM;
   /** Font face properties */
   fontFace: FontFace = { family: '', style: 'Regular', weight: 400 };
-  /** Capital letter height (absolute value) */
-  private _capHeight: number = 1.0;
-  /** Whether height is relative */
-  private _isHeightRelative: boolean = false;
-  /** Character width factor (absolute value) */
-  private _widthFactor: number = 1.0;
-  /** Whether width is relative */
-  private _isWidthRelative: boolean = false;
-  /** Character tracking factor */
-  charTrackingFactor: number = 1.0;
+  /** Capital letter height */
+  private _capHeight: FactorValue = { value: 1.0, isRelative: false };
+  /** Character width factor */
+  private _widthFactor: FactorValue = { value: 1.0, isRelative: false };
+  /**
+   * Character tracking factor a multiplier applied to the default spacing between characters in the MText object.
+   * - Value = 1.0 → Normal spacing.
+   * - Value < 1.0 → Characters are closer together.
+   * - Value > 1.0 → Characters are spaced farther apart.
+   */
+  private _charTrackingFactor: FactorValue = { value: 1.0, isRelative: false };
   /** Oblique angle */
   oblique: number = 0.0;
   /** Paragraph properties */
@@ -1230,49 +1241,55 @@ export class MTextContext {
   /**
    * Get the capital letter height
    */
-  get capHeight(): number {
+  get capHeight(): FactorValue {
     return this._capHeight;
   }
 
   /**
    * Set the capital letter height
    * @param value - Height value
-   * @param isRelative - Whether the value is relative
    */
-  set capHeight(value: { value: number; isRelative: boolean }) {
-    this._capHeight = Math.abs(value.value);
-    this._isHeightRelative = value.isRelative;
-  }
-
-  /**
-   * Get whether height is relative
-   */
-  get isHeightRelative(): boolean {
-    return this._isHeightRelative;
+  set capHeight(value: FactorValue) {
+    this._capHeight = {
+      value: Math.abs(value.value),
+      isRelative: value.isRelative,
+    };
   }
 
   /**
    * Get the character width factor
    */
-  get widthFactor(): number {
+  get widthFactor(): FactorValue {
     return this._widthFactor;
   }
 
   /**
    * Set the character width factor
    * @param value - Width factor value
-   * @param isRelative - Whether the value is relative
    */
-  set widthFactor(value: { value: number; isRelative: boolean }) {
-    this._widthFactor = Math.abs(value.value);
-    this._isWidthRelative = value.isRelative;
+  set widthFactor(value: FactorValue) {
+    this._widthFactor = {
+      value: Math.abs(value.value),
+      isRelative: value.isRelative,
+    };
   }
 
   /**
-   * Get whether width is relative
+   * Get the character tracking factor
    */
-  get isWidthRelative(): boolean {
-    return this._isWidthRelative;
+  get charTrackingFactor(): FactorValue {
+    return this._charTrackingFactor;
+  }
+
+  /**
+   * Set the character tracking factor
+   * @param value - Tracking factor value
+   */
+  set charTrackingFactor(value: FactorValue) {
+    this._charTrackingFactor = {
+      value: Math.abs(value.value),
+      isRelative: value.isRelative,
+    };
   }
 
   /**
@@ -1373,11 +1390,9 @@ export class MTextContext {
     ctx.rgb = this.rgb;
     ctx.align = this.align;
     ctx.fontFace = { ...this.fontFace };
-    ctx._capHeight = this._capHeight;
-    ctx._isHeightRelative = this._isHeightRelative;
-    ctx._widthFactor = this._widthFactor;
-    ctx._isWidthRelative = this._isWidthRelative;
-    ctx.charTrackingFactor = this.charTrackingFactor;
+    ctx._capHeight = { ...this._capHeight };
+    ctx._widthFactor = { ...this._widthFactor };
+    ctx._charTrackingFactor = { ...this._charTrackingFactor };
     ctx.oblique = this.oblique;
     ctx.paragraph = { ...this.paragraph };
     return ctx;
