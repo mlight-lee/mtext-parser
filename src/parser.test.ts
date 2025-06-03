@@ -95,9 +95,9 @@ describe('MTextContext', () => {
     expect(ctx.rgb).toBeNull();
     expect(ctx.align).toBe(MTextLineAlignment.BOTTOM);
     expect(ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
-    expect(ctx.capHeight).toBe(1.0);
-    expect(ctx.widthFactor).toBe(1.0);
-    expect(ctx.charTrackingFactor).toBe(1.0);
+    expect(ctx.capHeight).toEqual({ value: 1.0, isRelative: false });
+    expect(ctx.widthFactor).toEqual({ value: 1.0, isRelative: false });
+    expect(ctx.charTrackingFactor).toEqual({ value: 1.0, isRelative: false });
     expect(ctx.oblique).toBe(0.0);
     expect(ctx.paragraph).toEqual({
       indent: 0,
@@ -171,6 +171,32 @@ describe('MTextContext', () => {
       expect(copy.rgb).toEqual(ctx.rgb);
       expect(copy.fontFace).toEqual(ctx.fontFace);
       expect(copy.paragraph).toEqual(ctx.paragraph);
+    });
+  });
+
+  describe('factor properties', () => {
+    it('handles charTrackingFactor absolute values', () => {
+      ctx.charTrackingFactor = { value: 2.0, isRelative: false };
+      expect(ctx.charTrackingFactor).toEqual({ value: 2.0, isRelative: false });
+
+      ctx.charTrackingFactor = { value: 0.5, isRelative: false };
+      expect(ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: false });
+    });
+
+    it('handles charTrackingFactor relative values', () => {
+      ctx.charTrackingFactor = { value: 2.0, isRelative: true };
+      expect(ctx.charTrackingFactor).toEqual({ value: 2.0, isRelative: true });
+
+      ctx.charTrackingFactor = { value: 0.5, isRelative: true };
+      expect(ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: true });
+    });
+
+    it('converts negative values to positive for charTrackingFactor', () => {
+      ctx.charTrackingFactor = { value: -2.0, isRelative: false };
+      expect(ctx.charTrackingFactor).toEqual({ value: 2.0, isRelative: false });
+
+      ctx.charTrackingFactor = { value: -0.5, isRelative: true };
+      expect(ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: true });
     });
   });
 });
@@ -288,8 +314,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('parses relative height values with x suffix', () => {
@@ -297,8 +322,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: true });
       });
 
       it('handles optional terminator', () => {
@@ -306,8 +330,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles leading signs', () => {
@@ -315,15 +338,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(2.5); // Negative values are ignored
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false }); // Negative values are ignored
 
         parser = new MTextParser('\\H+2.5;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles decimal values without leading zero', () => {
@@ -331,22 +352,19 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.5, isRelative: true });
 
         parser = new MTextParser('\\H-.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.5); // Negative values are ignored
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.5, isRelative: true }); // Negative values are ignored
 
         parser = new MTextParser('\\H+.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.5, isRelative: true });
       });
 
       it('handles exponential notation', () => {
@@ -354,29 +372,25 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(100);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 100, isRelative: false });
 
         parser = new MTextParser('\\H1e-2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.01);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.01, isRelative: false });
 
         parser = new MTextParser('\\H.5e2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(50);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 50, isRelative: false });
 
         parser = new MTextParser('\\H.5e-2;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.005);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.005, isRelative: false });
       });
 
       it('handles invalid floating point values', () => {
@@ -384,22 +398,19 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('.5;Text');
-        expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 1.0, isRelative: false }); // Default value
 
         parser = new MTextParser('\\H1e;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('e;Text');
-        expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 1.0, isRelative: false }); // Default value
 
         parser = new MTextParser('\\H1e+;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('e+;Text');
-        expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 1.0, isRelative: false }); // Default value
       });
 
       it('handles complex height expressions', () => {
@@ -407,15 +418,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(0.15);
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 0.15, isRelative: true });
 
         parser = new MTextParser('\\H-.5e+2x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(50); // Negative values are ignored
-        expect(tokens[0].ctx.isHeightRelative).toBe(true);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 50, isRelative: true }); // Negative values are ignored
       });
 
       it('handles multiple height commands', () => {
@@ -423,12 +432,10 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('First');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('Second');
-        expect(tokens[1].ctx.capHeight).toBe(0.5);
-        expect(tokens[1].ctx.isHeightRelative).toBe(true);
+        expect(tokens[1].ctx.capHeight).toEqual({ value: 0.5, isRelative: true });
       });
 
       it('handles height command with no value', () => {
@@ -436,8 +443,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.capHeight).toBe(1.0); // Default value
-        expect(tokens[0].ctx.isHeightRelative).toBe(false);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 1.0, isRelative: false }); // Default value
       });
     });
 
@@ -447,8 +453,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(false);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('parses relative width values with x suffix', () => {
@@ -456,8 +461,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(true);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: true });
       });
 
       it('handles optional terminator', () => {
@@ -465,8 +469,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(false);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles leading signs', () => {
@@ -474,15 +477,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5); // Negative values are ignored
-        expect(tokens[0].ctx.isWidthRelative).toBe(false);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: false }); // Negative values are ignored
 
         parser = new MTextParser('\\W+2.5;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(false);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles decimal values without leading zero', () => {
@@ -490,15 +491,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(0.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(true);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 0.5, isRelative: true });
 
         parser = new MTextParser('\\W-.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.widthFactor).toBe(0.5); // Negative values are ignored
-        expect(tokens[0].ctx.isWidthRelative).toBe(true);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 0.5, isRelative: true }); // Negative values are ignored
       });
 
       it('handles multiple width commands', () => {
@@ -506,12 +505,10 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('First');
-        expect(tokens[0].ctx.widthFactor).toBe(2.5);
-        expect(tokens[0].ctx.isWidthRelative).toBe(false);
+        expect(tokens[0].ctx.widthFactor).toEqual({ value: 2.5, isRelative: false });
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('Second');
-        expect(tokens[1].ctx.widthFactor).toBe(0.5);
-        expect(tokens[1].ctx.isWidthRelative).toBe(true);
+        expect(tokens[1].ctx.widthFactor).toEqual({ value: 0.5, isRelative: true });
       });
     });
 
@@ -521,7 +518,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('parses relative tracking values with x suffix', () => {
@@ -529,7 +526,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: true });
       });
 
       it('handles optional terminator', () => {
@@ -537,7 +534,7 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles leading signs', () => {
@@ -545,13 +542,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5); // Negative values are ignored
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: false }); // Negative values are ignored
 
         parser = new MTextParser('\\T+2.5;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: false });
       });
 
       it('handles decimal values without leading zero', () => {
@@ -559,13 +556,13 @@ describe('MTextParser', () => {
         let tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(0.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: true });
 
         parser = new MTextParser('\\T-.5x;Text');
         tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Text');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(0.5); // Negative values are ignored
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: true }); // Negative values are ignored
       });
 
       it('handles multiple tracking commands', () => {
@@ -573,10 +570,18 @@ describe('MTextParser', () => {
         const tokens = Array.from(parser.parse());
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('First');
-        expect(tokens[0].ctx.charTrackingFactor).toBe(2.5);
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 2.5, isRelative: false });
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('Second');
-        expect(tokens[1].ctx.charTrackingFactor).toBe(0.5);
+        expect(tokens[1].ctx.charTrackingFactor).toEqual({ value: 0.5, isRelative: true });
+      });
+
+      it('handles tracking command with no value', () => {
+        const parser = new MTextParser('\\T;Text');
+        const tokens = Array.from(parser.parse());
+        expect(tokens[0].type).toBe(TokenType.WORD);
+        expect(tokens[0].data).toBe('Text');
+        expect(tokens[0].ctx.charTrackingFactor).toEqual({ value: 1.0, isRelative: false }); // Default value
       });
     });
 
@@ -692,10 +697,10 @@ describe('MTextParser', () => {
         expect(tokens).toHaveLength(2);
         expect(tokens[0].type).toBe(TokenType.WORD);
         expect(tokens[0].data).toBe('Ø');
-        expect(tokens[0].ctx.capHeight).toBe(2.5);
+        expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
         expect(tokens[1].type).toBe(TokenType.WORD);
         expect(tokens[1].data).toBe('°±');
-        expect(tokens[1].ctx.capHeight).toBe(0.5);
+        expect(tokens[1].ctx.capHeight).toEqual({ value: 0.5, isRelative: true });
       });
 
       it('handles invalid special character codes', () => {
@@ -757,10 +762,10 @@ describe('MTextParser', () => {
       expect(tokens).toHaveLength(2);
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('你');
-      expect(tokens[0].ctx.capHeight).toBe(2.5);
+      expect(tokens[0].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('好');
-      expect(tokens[1].ctx.capHeight).toBe(0.5);
+      expect(tokens[1].ctx.capHeight).toEqual({ value: 0.5, isRelative: true });
     });
 
     it('handles GBK characters with font properties', () => {
@@ -989,13 +994,12 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toEqual({
         command: 'H',
         changes: {
-          capHeight: 2.5,
-          isHeightRelative: false,
+          capHeight: { value: 2.5, isRelative: false },
         },
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Text');
-      expect(tokens[1].ctx.capHeight).toBe(2.5);
+      expect(tokens[1].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
     });
 
     it('yields property change tokens for multiple commands', () => {
@@ -1006,8 +1010,7 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toEqual({
         command: 'H',
         changes: {
-          capHeight: 2.5,
-          isHeightRelative: false,
+          capHeight: { value: 2.5, isRelative: false },
         },
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1027,7 +1030,7 @@ describe('MTextParser', () => {
       });
       expect(tokens[3].type).toBe(TokenType.WORD);
       expect(tokens[3].data).toBe('Text');
-      expect(tokens[3].ctx.capHeight).toBe(2.5);
+      expect(tokens[3].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       expect(tokens[3].ctx.aci).toBe(1);
       expect(tokens[3].ctx.underline).toBe(true);
       expect(tokens[4].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1084,8 +1087,7 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toEqual({
         command: 'H',
         changes: {
-          capHeight: 2.5,
-          isHeightRelative: false,
+          capHeight: { value: 2.5, isRelative: false },
         },
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1109,7 +1111,7 @@ describe('MTextParser', () => {
       });
       expect(tokens[3].type).toBe(TokenType.WORD);
       expect(tokens[3].data).toBe('Formatted');
-      expect(tokens[3].ctx.capHeight).toBe(2.5);
+      expect(tokens[3].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
       expect(tokens[3].ctx.aci).toBe(1);
       expect(tokens[3].ctx.fontFace).toEqual({
         family: 'Arial',
