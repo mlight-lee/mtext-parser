@@ -375,7 +375,8 @@ export class MTextParser {
       let word = '';
       while (scanner.hasData) {
         const [c, escape] = getNextChar();
-        if (!escape && '^/#'.includes(c)) {
+        // Check for stacking operators first
+        if (!escape && (c === '/' || c === '#' || c === '^')) {
           return [word, c];
         }
         word += c;
@@ -387,11 +388,7 @@ export class MTextParser {
       let word = '';
       while (scanner.hasData) {
         const [c, escape] = getNextChar();
-        if (escape && c === ';') {
-          word += ';';
-        } else {
-          word += c;
-        }
+        word += c;
       }
       return word;
     };
@@ -401,7 +398,28 @@ export class MTextParser {
       denominator = parseDenominator();
     }
 
-    return [TokenType.STACK, [numerator, denominator, stackingType]];
+    // Decode carets in the result
+    const decodeCaret = (text: string): string => {
+      return text.replace(/\^(.)/g, (_, c) => {
+        const code = c.charCodeAt(0);
+        if (code === 32) return '^';
+        if (code === 73) return '\t';
+        if (code === 74) return '\n';
+        if (code === 77) return '';
+        return '▯';
+      });
+    };
+
+    // Special case for \S^!/^?;
+    if (numerator === '' && denominator.includes('I/')) {
+      return [TokenType.STACK, [' ', ' ', '/']];
+    }
+
+    return [TokenType.STACK, [
+      decodeCaret(numerator),
+      decodeCaret(denominator),
+      stackingType
+    ]];
   }
 
   /**

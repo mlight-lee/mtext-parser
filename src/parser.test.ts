@@ -799,15 +799,29 @@ describe('MTextParser', () => {
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual(['1', '2', '/']);
 
-      parser = new MTextParser('\\S1^ 2;');
-      tokens = Array.from(parser.parse());
-      expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['1', '2', '^']);
-
       parser = new MTextParser('\\S1#2;');
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual(['1', '2', '#']);
+    });
+
+    it('handles caret for baseline alignment', () => {
+      let parser = new MTextParser('\\S1^2;');
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1', '2', '^']);
+
+      // Test with spaces
+      parser = new MTextParser('\\S1 2^3 4;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1 2', '3 4', '^']);
+
+      // Test with escaped characters
+      parser = new MTextParser('\\S1^2\\;;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1', '2;', '^']);
     });
 
     it('handles spaces in numerator and denominator', () => {
