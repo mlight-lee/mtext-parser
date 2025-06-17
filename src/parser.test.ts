@@ -6,7 +6,6 @@ import {
   MTextParagraphAlignment,
   rgb2int,
   int2rgb,
-  caretDecode,
   escapeDxfLineEndings,
   hasInlineFormattingCodes,
   TextScanner,
@@ -26,42 +25,6 @@ describe('Utility Functions', () => {
       expect(int2rgb(0x0000ff)).toEqual([255, 0, 0]);
       expect(int2rgb(0x00ff00)).toEqual([0, 255, 0]);
       expect(int2rgb(0xff0000)).toEqual([0, 0, 255]);
-    });
-  });
-
-  describe('caretDecode', () => {
-    it('handles control characters', () => {
-      expect(caretDecode('^I')).toBe('\t'); // Tabulator
-      expect(caretDecode('^J')).toBe('\n'); // Line feed
-      expect(caretDecode('^M')).toBe(''); // Carriage return is ignored
-    });
-
-    it('handles space after caret', () => {
-      expect(caretDecode('1^ 2')).toBe('1^2');
-      expect(caretDecode('^ ')).toBe('^');
-    });
-
-    it('renders empty square for unknown characters', () => {
-      expect(caretDecode('^!')).toBe('▯');
-      expect(caretDecode('^?')).toBe('▯');
-      expect(caretDecode('^#')).toBe('▯');
-      expect(caretDecode('^a')).toBe('▯');
-      expect(caretDecode('^z')).toBe('▯');
-      expect(caretDecode('^@')).toBe('▯');
-      expect(caretDecode('^A')).toBe('▯');
-      expect(caretDecode('^Z')).toBe('▯');
-      expect(caretDecode('^[')).toBe('▯');
-      expect(caretDecode('^\\')).toBe('▯');
-      expect(caretDecode('^]')).toBe('▯');
-      expect(caretDecode('^^')).toBe('▯');
-      expect(caretDecode('^_')).toBe('▯');
-    });
-
-    it('handles mixed cases', () => {
-      expect(caretDecode('Hello^JWorld')).toBe('Hello\nWorld');
-      expect(caretDecode('Tab^ISpace^ ')).toBe('Tab\tSpace^');
-      expect(caretDecode('^M^J^I')).toBe('\n\t');
-      expect(caretDecode('Text^!More')).toBe('Text▯More');
     });
   });
 
