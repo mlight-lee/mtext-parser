@@ -864,16 +864,34 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toEqual(['{1}', '2', '/']);
     });
 
-    it('decodes caret encoded chars', () => {
+    it('treats carets in stack formatting as literal text', () => {
       let parser = new MTextParser('\\S^I/^J;');
       let tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual([' ', ' ', '/']);
 
-      parser = new MTextParser('\\S^!/^?;');
+      parser = new MTextParser('\\Sabc^def;');
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['▯', '▯', '/']);
+      expect(tokens[0].data).toEqual(['abc', 'def', '^']);
+    });
+
+    it('handles subscript and superscript', () => {
+      // Subscript
+      let parser = new MTextParser('abc\\S^ 1;');
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toEqual('abc');
+      expect(tokens[1].type).toBe(TokenType.STACK);
+      expect(tokens[1].data).toEqual(['', '1', '^']);
+
+      // Superscript
+      parser = new MTextParser('abc\\S1^ ;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toEqual('abc');
+      expect(tokens[1].type).toBe(TokenType.STACK);
+      expect(tokens[1].data).toEqual(['1', '', '^']);
     });
 
     it('handles multiple divider chars', () => {
@@ -894,7 +912,7 @@ describe('MTextParser', () => {
       const parser = new MTextParser('\\S1 2/3 4^ 5 6;');
       const tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['1 2', '3 4^5 6', '/']);
+      expect(tokens[0].data).toEqual(['1 2', '3 4^ 5 6', '/']);
     });
   });
 

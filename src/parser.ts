@@ -232,43 +232,6 @@ export function int2rgb(value: number): RGB {
 }
 
 /**
- * DXF stores some special characters using caret notation. This function
- * decodes this notation to normalize the representation of special characters
- * in the string.
- * see: https://en.wikipedia.org/wiki/Caret_notation
- * @param text - Text to decode
- * @returns Decoded text
- */
-export function caretDecode(text: string): string {
-  return text.replace(/\^(.)/g, (_, c) => {
-    const code = c.charCodeAt(0);
-
-    // Handle space after caret
-    if (code === 32) {
-      // Space
-      return '^';
-    }
-
-    // Handle control characters
-    if (code === 73) {
-      // Tab (^I)
-      return '\t';
-    }
-    if (code === 74) {
-      // Line Feed (^J)
-      return '\n';
-    }
-    if (code === 77) {
-      // Carriage Return (^M)
-      return '';
-    }
-
-    // Handle all other characters
-    return '▯';
-  });
-}
-
-/**
  * Escape DXF line endings
  * @param text - Text to escape
  * @returns Escaped text
@@ -297,6 +260,7 @@ export class MTextParser {
   private yieldPropertyCommands: boolean;
   private decoder: TextDecoder;
   private lastCtx: MTextContext;
+  private inStackContext: boolean = false;
 
   /**
    * Creates a new MTextParser instance
@@ -305,7 +269,7 @@ export class MTextParser {
    * @param yieldPropertyCommands - Whether to yield property change commands
    */
   constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
-    this.scanner = new TextScanner(caretDecode(content));
+    this.scanner = new TextScanner(content);
     this.ctx = ctx ?? new MTextContext();
     this.lastCtx = this.ctx.copy();
     this.yieldPropertyCommands = yieldPropertyCommands;
@@ -323,8 +287,22 @@ export class MTextParser {
         parseInt(hex.substr(0, 2), 16),
         parseInt(hex.substr(2, 2), 16),
       ]);
-      // TODO: handle BIG5 encoding too
-      return this.decoder.decode(bytes);
+
+      // Try GBK first
+      const gbkDecoder = new TextDecoder('gbk');
+      const gbkResult = gbkDecoder.decode(bytes);
+      if (gbkResult !== '▯') {
+        return gbkResult;
+      }
+
+      // Try BIG5 if GBK fails
+      const big5Decoder = new TextDecoder('big5');
+      const big5Result = big5Decoder.decode(bytes);
+      if (big5Result !== '▯') {
+        return big5Result;
+      }
+
+      return '▯';
     } catch {
       return '▯';
     }
@@ -384,10 +362,19 @@ export class MTextParser {
       return [word, ''];
     };
 
-    const parseDenominator = (): string => {
+    const parseDenominator = (skipLeadingSpace: boolean): string => {
       let word = '';
+      let skipping = skipLeadingSpace;
       while (scanner.hasData) {
         const [c, escape] = getNextChar();
+        if (skipping && c === ' ') {
+          continue;
+        }
+        skipping = false;
+        // Stop at terminator unless escaped
+        if (!escape && c === ';') {
+          break;
+        }
         word += c;
       }
       return word;
@@ -395,31 +382,21 @@ export class MTextParser {
 
     [numerator, stackingType] = parseNumerator();
     if (stackingType) {
-      denominator = parseDenominator();
+      // Only skip leading space for caret divider
+      denominator = parseDenominator(stackingType === '^');
     }
-
-    // Decode carets in the result
-    const decodeCaret = (text: string): string => {
-      return text.replace(/\^(.)/g, (_, c) => {
-        const code = c.charCodeAt(0);
-        if (code === 32) return '^';
-        if (code === 73) return '\t';
-        if (code === 74) return '\n';
-        if (code === 77) return '';
-        return '▯';
-      });
-    };
 
     // Special case for \S^!/^?;
     if (numerator === '' && denominator.includes('I/')) {
       return [TokenType.STACK, [' ', ' ', '/']];
     }
 
-    return [TokenType.STACK, [
-      decodeCaret(numerator),
-      decodeCaret(denominator),
-      stackingType
-    ]];
+    // Handle caret as a stacking operator
+    if (stackingType === '^') {
+      return [TokenType.STACK, [numerator, denominator, '^']];
+    }
+
+    return [TokenType.STACK, [numerator, denominator, stackingType]];
   }
 
   /**
@@ -493,6 +470,8 @@ export class MTextParser {
         throw new Error(`Unknown command: ${cmd}`);
     }
 
+    // Update continueStroke based on current stroke state
+    this.continueStroke = newCtx.hasAnyStroke;
     newCtx.continueStroke = this.continueStroke;
     this.ctx = newCtx;
 
@@ -702,9 +681,9 @@ export class MTextParser {
     if (expr) {
       if (expr.endsWith('x')) {
         const factor = parseFloat(expr.slice(0, -1));
-        value *= Math.abs(factor);
+        value *= factor; // Allow negative factors
       } else {
-        value = Math.abs(parseFloat(expr));
+        value = parseFloat(expr); // Allow negative values
       }
     }
     return value;
@@ -977,8 +956,12 @@ export class MTextParser {
                 return [TokenType.NEW_COLUMN, null];
               case 'X':
                 return [TokenType.WRAP_AT_DIMLINE, null];
-              case 'S':
-                return this.parseStacking();
+              case 'S': {
+                this.inStackContext = true;
+                const result = this.parseStacking();
+                this.inStackContext = false;
+                return result;
+              }
               case 'm':
               case 'M':
                 // Handle multi-byte character encoding
@@ -1060,6 +1043,38 @@ export class MTextParser {
             }
             this.scanner.consume(1);
             this.popCtx();
+            continue;
+          }
+        }
+
+        // Handle caret-encoded characters only when not in stack context
+        if (!this.inStackContext && letter === '^') {
+          const nextChar = this.scanner.peek(1);
+          if (nextChar) {
+            const code = nextChar.charCodeAt(0);
+            this.scanner.consume(2); // Consume both ^ and the next character
+            if (code === 32) {
+              // Space
+              word += '^';
+            } else if (code === 73) {
+              // Tab
+              if (word) {
+                return [wordToken, word];
+              }
+              return [TokenType.TABULATOR, null];
+            } else if (code === 74) {
+              // Line feed
+              if (word) {
+                return [wordToken, word];
+              }
+              return [TokenType.NEW_PARAGRAPH, null];
+            } else if (code === 77) {
+              // Carriage return
+              // Ignore carriage return
+              continue;
+            } else {
+              word += '▯';
+            }
             continue;
           }
         }

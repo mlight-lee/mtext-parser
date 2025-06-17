@@ -92,10 +92,14 @@ function processTokens(parser: MTextParser, title: string) {
       font: ctx.fontFace.family ? ctx.fontFace : undefined,
       color: ctx.rgb ? `RGB(${ctx.rgb.join(',')})` : ctx.aci !== 7 ? `ACI(${ctx.aci})` : undefined,
       height:
-        ctx.capHeight !== 1.0 ? `${ctx.capHeight}${ctx.isHeightRelative ? 'x' : ''}` : undefined,
+        ctx.capHeight.value !== 1.0
+          ? `${ctx.capHeight.value}${ctx.capHeight.isRelative ? 'x' : ''}`
+          : undefined,
       width:
-        ctx.widthFactor !== 1.0 ? `${ctx.widthFactor}${ctx.isWidthRelative ? 'x' : ''}` : undefined,
-      tracking: ctx.charTrackingFactor !== 1.0 ? ctx.charTrackingFactor : undefined,
+        ctx.widthFactor.value !== 1.0
+          ? `${ctx.widthFactor.value}${ctx.widthFactor.isRelative ? 'x' : ''}`
+          : undefined,
+      tracking: ctx.charTrackingFactor.value !== 1.0 ? ctx.charTrackingFactor : undefined,
       oblique: ctx.oblique !== 0.0 ? ctx.oblique : undefined,
       underline: ctx.underline ? true : undefined,
       overline: ctx.overline ? true : undefined,
