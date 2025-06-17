@@ -64,7 +64,7 @@ The text formatting is done by inline codes. You can get more information from [
 - the numerator and denominator can contain spaces
 - backslashes “\” inside the stacking command are ignored (except “\;”) “\S\N^ \P” render “N” over “P”, therefore property changes (color, text height, …) are not possible inside the stacking command
 - grouping chars “{” and “}” render as simple curly braces
-- caret encoded chars are decoded “^I”, “^J”, “^M”, but render as a simple space “ “ or as the replacement char “▯” plus a space
+- in the context of the MText \S...; stack command, the ^ is always treated as a stack separator, regardless of what characters come before or after it — even if those characters look like caret-encoded control characters (^I, ^J, ^!, ^?, etc.) in other contexts.
 - a divider char after the first divider char, renders as the char itself: “\S1/2/3” renders the horizontal fraction “1” / “2/3”
 
 ### Font command “\f” and “\F”: export only “\f”, parse both, “\F” ignores some arguments

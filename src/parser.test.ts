@@ -6,7 +6,6 @@ import {
   MTextParagraphAlignment,
   rgb2int,
   int2rgb,
-  caretDecode,
   escapeDxfLineEndings,
   hasInlineFormattingCodes,
   TextScanner,
@@ -26,42 +25,6 @@ describe('Utility Functions', () => {
       expect(int2rgb(0x0000ff)).toEqual([255, 0, 0]);
       expect(int2rgb(0x00ff00)).toEqual([0, 255, 0]);
       expect(int2rgb(0xff0000)).toEqual([0, 0, 255]);
-    });
-  });
-
-  describe('caretDecode', () => {
-    it('handles control characters', () => {
-      expect(caretDecode('^I')).toBe('\t'); // Tabulator
-      expect(caretDecode('^J')).toBe('\n'); // Line feed
-      expect(caretDecode('^M')).toBe(''); // Carriage return is ignored
-    });
-
-    it('handles space after caret', () => {
-      expect(caretDecode('1^ 2')).toBe('1^2');
-      expect(caretDecode('^ ')).toBe('^');
-    });
-
-    it('renders empty square for unknown characters', () => {
-      expect(caretDecode('^!')).toBe('▯');
-      expect(caretDecode('^?')).toBe('▯');
-      expect(caretDecode('^#')).toBe('▯');
-      expect(caretDecode('^a')).toBe('▯');
-      expect(caretDecode('^z')).toBe('▯');
-      expect(caretDecode('^@')).toBe('▯');
-      expect(caretDecode('^A')).toBe('▯');
-      expect(caretDecode('^Z')).toBe('▯');
-      expect(caretDecode('^[')).toBe('▯');
-      expect(caretDecode('^\\')).toBe('▯');
-      expect(caretDecode('^]')).toBe('▯');
-      expect(caretDecode('^^')).toBe('▯');
-      expect(caretDecode('^_')).toBe('▯');
-    });
-
-    it('handles mixed cases', () => {
-      expect(caretDecode('Hello^JWorld')).toBe('Hello\nWorld');
-      expect(caretDecode('Tab^ISpace^ ')).toBe('Tab\tSpace^');
-      expect(caretDecode('^M^J^I')).toBe('\n\t');
-      expect(caretDecode('Text^!More')).toBe('Text▯More');
     });
   });
 
@@ -799,15 +762,29 @@ describe('MTextParser', () => {
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual(['1', '2', '/']);
 
-      parser = new MTextParser('\\S1^ 2;');
-      tokens = Array.from(parser.parse());
-      expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['1', '2', '^']);
-
       parser = new MTextParser('\\S1#2;');
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual(['1', '2', '#']);
+    });
+
+    it('handles caret for baseline alignment', () => {
+      let parser = new MTextParser('\\S1^2;');
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1', '2', '^']);
+
+      // Test with spaces
+      parser = new MTextParser('\\S1 2^3 4;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1 2', '3 4', '^']);
+
+      // Test with escaped characters
+      parser = new MTextParser('\\S1^2\\;;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.STACK);
+      expect(tokens[0].data).toEqual(['1', '2;', '^']);
     });
 
     it('handles spaces in numerator and denominator', () => {
@@ -850,16 +827,34 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toEqual(['{1}', '2', '/']);
     });
 
-    it('decodes caret encoded chars', () => {
+    it('treats carets in stack formatting as literal text', () => {
       let parser = new MTextParser('\\S^I/^J;');
       let tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
       expect(tokens[0].data).toEqual([' ', ' ', '/']);
 
-      parser = new MTextParser('\\S^!/^?;');
+      parser = new MTextParser('\\Sabc^def;');
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['▯', '▯', '/']);
+      expect(tokens[0].data).toEqual(['abc', 'def', '^']);
+    });
+
+    it('handles subscript and superscript', () => {
+      // Subscript
+      let parser = new MTextParser('abc\\S^ 1;');
+      let tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toEqual('abc');
+      expect(tokens[1].type).toBe(TokenType.STACK);
+      expect(tokens[1].data).toEqual(['', '1', '^']);
+
+      // Superscript
+      parser = new MTextParser('abc\\S1^ ;');
+      tokens = Array.from(parser.parse());
+      expect(tokens[0].type).toBe(TokenType.WORD);
+      expect(tokens[0].data).toEqual('abc');
+      expect(tokens[1].type).toBe(TokenType.STACK);
+      expect(tokens[1].data).toEqual(['1', '', '^']);
     });
 
     it('handles multiple divider chars', () => {
@@ -880,7 +875,7 @@ describe('MTextParser', () => {
       const parser = new MTextParser('\\S1 2/3 4^ 5 6;');
       const tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.STACK);
-      expect(tokens[0].data).toEqual(['1 2', '3 4^5 6', '/']);
+      expect(tokens[0].data).toEqual(['1 2', '3 4^ 5 6', '/']);
     });
   });
 
