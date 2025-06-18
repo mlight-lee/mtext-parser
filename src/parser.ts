@@ -251,24 +251,29 @@ export function hasInlineFormattingCodes(text: string): boolean {
 
 /**
  * Extracts all unique font names used in an MText string.
- * This function searches for font commands in the format \f{fontname}| and returns a set of unique font names.
+ * This function searches for font commands in the format \f{fontname}| or \f{fontname}; and returns a set of unique font names.
  * Font names are converted to lowercase to ensure case-insensitive uniqueness.
  *
  * @param mtext - The MText string to analyze for font names
+ * @param removeExtension - Whether to remove font file extensions (e.g., .ttf, .shx) from font names. Defaults to false.
  * @returns A Set containing all unique font names found in the MText string, converted to lowercase
  * @example
  * ```ts
- * const mtext = "\\fArial|Hello\\fTimes New Roman|World";
- * const fonts = getFonts(mtext);
+ * const mtext = "\\fArial.ttf|Hello\\fTimes New Roman.otf|World";
+ * const fonts = getFonts(mtext, true);
  * // Returns: Set(2) { "arial", "times new roman" }
  * ```
  */
-export function getFonts(mtext: string) {
+export function getFonts(mtext: string, removeExtension: boolean = false) {
   const fonts: Set<string> = new Set();
   const regex = /\\[fF](.*?)[;|]/g;
 
   [...mtext.matchAll(regex)].forEach(match => {
-    fonts.add(match[1].toLowerCase());
+    let fontName = match[1].toLowerCase();
+    if (removeExtension) {
+      fontName = fontName.replace(/\.(ttf|otf|woff|shx)$/, '');
+    }
+    fonts.add(fontName);
   });
 
   return fonts;

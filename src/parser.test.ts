@@ -1234,4 +1234,28 @@ describe('getFonts', () => {
     const result = getFonts(mtext);
     expect(result).toEqual(new Set(['simsun', 'arial', 'romans', 'simhei', 'simkai']));
   });
+
+  it('should preserve font extensions when removeExtension is false', () => {
+    const mtext = '\\fArial.ttf|Hello \\fTimes New Roman.otf|World';
+    const result = getFonts(mtext, false);
+    expect(result).toEqual(new Set(['arial.ttf', 'times new roman.otf']));
+  });
+
+  it('should remove font extensions when removeExtension is true', () => {
+    const mtext = '\\fArial.ttf|Hello \\fTimes New Roman.otf|World';
+    const result = getFonts(mtext, true);
+    expect(result).toEqual(new Set(['arial', 'times new roman']));
+  });
+
+  it('should handle various font extensions', () => {
+    const mtext = '\\fFont1.ttf|Text1 \\fFont2.otf|Text2 \\fFont3.woff|Text3 \\fFont4.shx|Text4';
+    const result = getFonts(mtext, true);
+    expect(result).toEqual(new Set(['font1', 'font2', 'font3', 'font4']));
+  });
+
+  it('should not remove non-font extensions', () => {
+    const mtext = '\\fFont1.txt|Text1 \\fFont2.doc|Text2';
+    const result = getFonts(mtext, true);
+    expect(result).toEqual(new Set(['font1.txt', 'font2.doc']));
+  });
 });
