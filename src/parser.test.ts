@@ -9,6 +9,7 @@ import {
   escapeDxfLineEndings,
   hasInlineFormattingCodes,
   TextScanner,
+  getFonts,
 } from './parser';
 
 describe('Utility Functions', () => {
@@ -1183,5 +1184,47 @@ describe('TextScanner', () => {
     expect(scanner.hasData).toBe(false);
     expect(scanner.get()).toBe('');
     expect(scanner.peek()).toBe('');
+  });
+});
+
+describe('getFonts', () => {
+  it('should return empty set for empty string', () => {
+    const result = getFonts('');
+    expect(result).toEqual(new Set());
+  });
+
+  it('should extract single font name', () => {
+    const result = getFonts('\\fArial|Hello World');
+    expect(result).toEqual(new Set(['arial']));
+  });
+
+  it('should extract multiple unique font names', () => {
+    const result = getFonts('\\fArial|Hello \\fTimes New Roman|World');
+    expect(result).toEqual(new Set(['arial', 'times new roman']));
+  });
+
+  it('should handle case-insensitive font names', () => {
+    const result = getFonts('\\fARIAL|Hello \\fArial|World');
+    expect(result).toEqual(new Set(['arial']));
+  });
+
+  it('should handle font names with spaces', () => {
+    const result = getFonts('\\fTimes New Roman|Hello \\fComic Sans MS|World');
+    expect(result).toEqual(new Set(['times new roman', 'comic sans ms']));
+  });
+
+  it('should handle multiple font changes in sequence', () => {
+    const result = getFonts('\\fArial|Hello \\fTimes New Roman|World \\fArial|Again');
+    expect(result).toEqual(new Set(['arial', 'times new roman']));
+  });
+
+  it('should handle font names with special characters', () => {
+    const result = getFonts('\\fArial-Bold|Hello \\fTimes-New-Roman|World');
+    expect(result).toEqual(new Set(['arial-bold', 'times-new-roman']));
+  });
+
+  it('should handle both lowercase and uppercase font commands', () => {
+    const result = getFonts('\\fArial|Hello \\FTimes New Roman|World');
+    expect(result).toEqual(new Set(['arial', 'times new roman']));
   });
 });
