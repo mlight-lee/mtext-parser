@@ -1227,4 +1227,11 @@ describe('getFonts', () => {
     const result = getFonts('\\fArial|Hello \\FTimes New Roman|World');
     expect(result).toEqual(new Set(['arial', 'times new roman']));
   });
+
+  it('should handle complex MText with semicolon terminators', () => {
+    const mtext =
+      '{\\C1;\\W2;\\FSimSun;SimSun Text}\\P{\\C2;\\W0.5;\\FArial;Arial Text}\\P{\\C3;\\O30;\\FRomans;Romans Text}\\P{\\C4;\\Q1;\\FSimHei;SimHei Text}\\P{\\C5;\\Q0.5;\\FSimKai;SimKai Text}';
+    const result = getFonts(mtext);
+    expect(result).toEqual(new Set(['simsun', 'arial', 'romans', 'simhei', 'simkai']));
+  });
 });

@@ -265,7 +265,7 @@ export function hasInlineFormattingCodes(text: string): boolean {
  */
 export function getFonts(mtext: string) {
   const fonts: Set<string> = new Set();
-  const regex = /\\[fF](.*?)\|/g;
+  const regex = /\\[fF](.*?)[;|]/g;
 
   [...mtext.matchAll(regex)].forEach(match => {
     fonts.add(match[1].toLowerCase());
