@@ -253,7 +253,7 @@ export function hasInlineFormattingCodes(text: string): boolean {
  * Extracts all unique font names used in an MText string.
  * This function searches for font commands in the format \f{fontname}| and returns a set of unique font names.
  * Font names are converted to lowercase to ensure case-insensitive uniqueness.
- * 
+ *
  * @param mtext - The MText string to analyze for font names
  * @returns A Set containing all unique font names found in the MText string, converted to lowercase
  * @example
@@ -268,8 +268,8 @@ export function getFonts(mtext: string) {
   const regex = /\\[fF](.*?)\|/g;
 
   [...mtext.matchAll(regex)].forEach(match => {
-    fonts.add(match[1].toLowerCase())
-  })
+    fonts.add(match[1].toLowerCase());
+  });
 
   return fonts;
 }
@@ -283,7 +283,6 @@ export class MTextParser {
   private ctxStack: MTextContext[] = [];
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
-  private decoder: TextDecoder;
   private lastCtx: MTextContext;
   private inStackContext: boolean = false;
 
@@ -298,7 +297,6 @@ export class MTextParser {
     this.ctx = ctx ?? new MTextContext();
     this.lastCtx = this.ctx.copy();
     this.yieldPropertyCommands = yieldPropertyCommands;
-    this.decoder = new TextDecoder('gbk');
   }
 
   /**
