@@ -93,8 +93,8 @@ function processTokens(parser: MTextParser, title: string) {
       color: ctx.color.isRgb
         ? `RGB(${ctx.color.rgb!.join(',')}) [${ctx.color.rgbValue?.toString(16)}]`
         : ctx.color.aci !== null
-        ? `ACI(${ctx.color.aci})`
-        : undefined,
+          ? `ACI(${ctx.color.aci})`
+          : undefined,
       height:
         ctx.capHeight.value !== 1.0
           ? `${ctx.capHeight.value}${ctx.capHeight.isRelative ? 'x' : ''}`

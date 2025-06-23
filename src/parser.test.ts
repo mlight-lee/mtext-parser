@@ -966,7 +966,6 @@ describe('MTextParser', () => {
         command: 'C',
         changes: {
           aci: 1,
-          rgb: null,
         },
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
@@ -1048,7 +1047,6 @@ describe('MTextParser', () => {
         command: 'C',
         changes: {
           aci: 1,
-          rgb: null,
         },
       });
       expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1125,7 +1123,6 @@ describe('MTextParser', () => {
         command: 'C',
         changes: {
           aci: 1,
-          rgb: null,
         },
       });
       expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
