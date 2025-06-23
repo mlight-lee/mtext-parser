@@ -538,7 +538,6 @@ export class MTextParser {
     }
     if (oldCtx.color.aci !== newCtx.color.aci) {
       changes.aci = newCtx.color.aci;
-      changes.rgb = newCtx.color.rgb; // Always include rgb when aci changes
     }
     if (oldCtx.color.rgbValue !== newCtx.color.rgbValue) {
       changes.rgb = newCtx.color.rgb;
