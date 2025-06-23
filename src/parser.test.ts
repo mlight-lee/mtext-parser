@@ -10,6 +10,7 @@ import {
   hasInlineFormattingCodes,
   TextScanner,
   getFonts,
+  MTextColor,
 } from './parser';
 
 describe('Utility Functions', () => {
@@ -55,7 +56,7 @@ describe('MTextContext', () => {
   });
 
   it('initializes with default values', () => {
-    expect(ctx.aci).toBe(7);
+    expect(ctx.aci).toBe(256);
     expect(ctx.rgb).toBeNull();
     expect(ctx.align).toBe(MTextLineAlignment.BOTTOM);
     expect(ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
@@ -116,12 +117,36 @@ describe('MTextContext', () => {
       ctx.aci = 1;
       expect(ctx.aci).toBe(1);
       expect(ctx.rgb).toBeNull();
+      expect(ctx.color.aci).toBe(1);
+      expect(ctx.color.rgb).toBeNull();
+      expect(ctx.color.rgbValue).toBeNull();
       expect(() => (ctx.aci = 257)).toThrow('ACI not in range [0, 256]');
     });
 
     it('handles RGB color', () => {
       ctx.rgb = [255, 0, 0];
       expect(ctx.rgb).toEqual([255, 0, 0]);
+      expect(ctx.color.rgb).toEqual([255, 0, 0]);
+      expect(ctx.color.aci).toBeNull();
+      expect(ctx.color.rgbValue).toBe(0xff0000);
+    });
+
+    it('switches from RGB to ACI', () => {
+      ctx.rgb = [255, 0, 0];
+      ctx.aci = 2;
+      expect(ctx.rgb).toBeNull();
+      expect(ctx.aci).toBe(2);
+      expect(ctx.color.rgb).toBeNull();
+      expect(ctx.color.aci).toBe(2);
+      expect(ctx.color.rgbValue).toBeNull();
+    });
+
+    it('handles RGB value set directly', () => {
+      ctx.color.rgbValue = 0x00ff00;
+      expect(ctx.rgb).toEqual([0, 255, 0]);
+      expect(ctx.color.rgb).toEqual([0, 255, 0]);
+      expect(ctx.color.rgbValue).toBe(0x00ff00);
+      expect(ctx.color.aci).toBeNull();
     });
   });
 
@@ -133,8 +158,17 @@ describe('MTextContext', () => {
       expect(copy).not.toBe(ctx);
       expect(copy.underline).toBe(ctx.underline);
       expect(copy.rgb).toEqual(ctx.rgb);
+      expect(copy.color.rgb).toEqual(ctx.color.rgb);
+      expect(copy.color.aci).toBe(ctx.color.aci);
+      expect(copy.color.rgbValue).toBe(ctx.color.rgbValue);
       expect(copy.fontFace).toEqual(ctx.fontFace);
       expect(copy.paragraph).toEqual(ctx.paragraph);
+      // Changing the copy's color should not affect the original
+      copy.rgb = [0, 255, 0];
+      expect(ctx.rgb).toEqual([255, 0, 0]);
+      expect(copy.rgb).toEqual([0, 255, 0]);
+      expect(copy.color.rgbValue).toBe(0x00ff00);
+      expect(ctx.color.rgbValue).toBe(0xff0000);
     });
   });
 
@@ -1257,5 +1291,53 @@ describe('getFonts', () => {
     const mtext = '\\fFont1.txt|Text1 \\fFont2.doc|Text2';
     const result = getFonts(mtext, true);
     expect(result).toEqual(new Set(['font1.txt', 'font2.doc']));
+  });
+});
+
+describe('MTextColor', () => {
+  it('defaults to ACI 256 (by layer)', () => {
+    const color = new MTextColor();
+    expect(color.aci).toBe(256);
+    expect(color.rgb).toBeNull();
+    expect(color.isAci).toBe(true);
+    expect(color.isRgb).toBe(false);
+  });
+
+  it('can be constructed with ACI', () => {
+    const color = new MTextColor(1);
+    expect(color.aci).toBe(1);
+    expect(color.rgb).toBeNull();
+    expect(color.isAci).toBe(true);
+    expect(color.isRgb).toBe(false);
+  });
+
+  it('can be constructed with RGB', () => {
+    const color = new MTextColor([255, 0, 0]);
+    expect(color.aci).toBeNull();
+    expect(color.rgb).toEqual([255, 0, 0]);
+    expect(color.isAci).toBe(false);
+    expect(color.isRgb).toBe(true);
+  });
+
+  it('switches from ACI to RGB and back', () => {
+    const color = new MTextColor(2);
+    expect(color.aci).toBe(2);
+    color.rgb = [0, 255, 0];
+    expect(color.aci).toBeNull();
+    expect(color.rgb).toEqual([0, 255, 0]);
+    color.aci = 7;
+    expect(color.aci).toBe(7);
+    expect(color.rgb).toBeNull();
+  });
+
+  it('copy() produces a deep copy', () => {
+    const color = new MTextColor([1, 2, 3]);
+    const copy = color.copy();
+    expect(copy).not.toBe(color);
+    expect(copy.aci).toBe(color.aci);
+    expect(copy.rgb).toEqual(color.rgb);
+    copy.rgb = [4, 5, 6];
+    expect(color.rgb).toEqual([1, 2, 3]);
+    expect(copy.rgb).toEqual([4, 5, 6]);
   });
 });
