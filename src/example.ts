@@ -90,7 +90,11 @@ function processTokens(parser: MTextParser, title: string) {
     const ctx = token.ctx;
     const contextProps = {
       font: ctx.fontFace.family ? ctx.fontFace : undefined,
-      color: ctx.rgb ? `RGB(${ctx.rgb.join(',')})` : ctx.aci !== 7 ? `ACI(${ctx.aci})` : undefined,
+      color: ctx.color.isRgb
+        ? `RGB(${ctx.color.rgb!.join(',')}) [${ctx.color.rgbValue?.toString(16)}]`
+        : ctx.color.aci !== null
+        ? `ACI(${ctx.color.aci})`
+        : undefined,
       height:
         ctx.capHeight.value !== 1.0
           ? `${ctx.capHeight.value}${ctx.capHeight.isRelative ? 'x' : ''}`

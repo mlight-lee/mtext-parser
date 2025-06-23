@@ -36,7 +36,7 @@ export interface Properties {
   underline?: boolean;
   overline?: boolean;
   strikeThrough?: boolean;
-  aci?: number;
+  aci?: number | null;
   rgb?: RGB | null;
   align?: MTextLineAlignment;
   fontFace?: FontFace;
@@ -536,12 +536,12 @@ export class MTextParser {
     if (oldCtx.strikeThrough !== newCtx.strikeThrough) {
       changes.strikeThrough = newCtx.strikeThrough;
     }
-    if (oldCtx.aci !== newCtx.aci) {
-      changes.aci = newCtx.aci;
-      changes.rgb = newCtx.rgb; // Always include rgb when aci changes
+    if (oldCtx.color.aci !== newCtx.color.aci) {
+      changes.aci = newCtx.color.aci;
+      changes.rgb = newCtx.color.rgb; // Always include rgb when aci changes
     }
-    if (oldCtx.rgb !== newCtx.rgb) {
-      changes.rgb = newCtx.rgb;
+    if (oldCtx.color.rgbValue !== newCtx.color.rgbValue) {
+      changes.rgb = newCtx.color.rgb;
     }
     if (oldCtx.align !== newCtx.align) {
       changes.align = newCtx.align;
@@ -738,8 +738,7 @@ export class MTextParser {
     if (aciExpr) {
       const aci = parseInt(aciExpr);
       if (aci < 257) {
-        ctx.aci = aci;
-        ctx.rgb = null;
+        ctx.color.aci = aci;
       }
     }
     this.consumeOptionalTerminator();
@@ -753,8 +752,7 @@ export class MTextParser {
     const rgbExpr = this.extractIntExpression();
     if (rgbExpr) {
       const value = parseInt(rgbExpr) & 0xffffff;
-      const [b, g, r] = int2rgb(value);
-      ctx.rgb = [r, g, b];
+      ctx.color.rgbValue = value;
     }
     this.consumeOptionalTerminator();
   }
@@ -1264,15 +1262,165 @@ export class TextScanner {
 }
 
 /**
+ * Class to handle ACI and RGB color logic for MText.
+ *
+ * This class encapsulates color state for MText, supporting both AutoCAD Color Index (ACI) and RGB color.
+ * Only one color mode is active at a time: setting an RGB color disables ACI, and vice versa.
+ * RGB is stored as a single 24-bit integer (0xRRGGBB) for efficient comparison and serialization.
+ *
+ * Example usage:
+ * ```ts
+ * const color1 = new MTextColor(1); // ACI color
+ * const color2 = new MTextColor([255, 0, 0]); // RGB color
+ * const color3 = new MTextColor(); // Default (ACI=256, "by layer")
+ * ```
+ */
+export class MTextColor {
+  /**
+   * The AutoCAD Color Index (ACI) value. Only used if no RGB color is set.
+   * @default 256 ("by layer")
+   */
+  private _aci: number | null = 256;
+  /**
+   * The RGB color value as a single 24-bit integer (0xRRGGBB), or null if not set.
+   * @default null
+   */
+  private _rgbValue: number | null = null; // Store as 0xRRGGBB or null
+
+  /**
+   * Create a new MTextColor instance.
+   * @param color The initial color: number for ACI, [r,g,b] for RGB, or null/undefined for default (ACI=256).
+   */
+  constructor(color?: number | RGB | null) {
+    if (Array.isArray(color)) {
+      this.rgb = color;
+    } else if (typeof color === 'number') {
+      this.aci = color;
+    } else {
+      this.aci = 256;
+    }
+  }
+
+  /**
+   * Get the current ACI color value.
+   * @returns The ACI color (0-256), or null if using RGB.
+   */
+  get aci(): number | null {
+    return this._aci;
+  }
+
+  /**
+   * Set the ACI color value. Setting this disables any RGB color.
+   * @param value The ACI color (0-256), or null to unset.
+   * @throws Error if value is out of range.
+   */
+  set aci(value: number | null) {
+    if (value === null) {
+      this._aci = null;
+    } else if (value >= 0 && value <= 256) {
+      this._aci = value;
+      this._rgbValue = null;
+    } else {
+      throw new Error('ACI not in range [0, 256]');
+    }
+  }
+
+  /**
+   * Get the current RGB color as a tuple [r, g, b], or null if not set.
+   * @returns The RGB color tuple, or null if using ACI.
+   */
+  get rgb(): RGB | null {
+    if (this._rgbValue === null) return null;
+    // Extract R, G, B from 0xRRGGBB
+    const r = (this._rgbValue >> 16) & 0xff;
+    const g = (this._rgbValue >> 8) & 0xff;
+    const b = this._rgbValue & 0xff;
+    return [r, g, b];
+  }
+
+  /**
+   * Set the RGB color. Setting this disables ACI color.
+   * @param value The RGB color tuple [r, g, b], or null to use ACI.
+   */
+  set rgb(value: RGB | null) {
+    if (value) {
+      const [r, g, b] = value;
+      this._rgbValue = ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+      this._aci = null;
+    } else {
+      this._rgbValue = null;
+    }
+  }
+
+  /**
+   * Returns true if the color is set by RGB, false if by ACI.
+   */
+  get isRgb(): boolean {
+    return this._rgbValue !== null;
+  }
+
+  /**
+   * Returns true if the color is set by ACI, false if by RGB.
+   */
+  get isAci(): boolean {
+    return this._rgbValue === null && this._aci !== null;
+  }
+
+  /**
+   * Get or set the internal RGB value as a number (0xRRGGBB), or null if not set.
+   * Setting this will switch to RGB mode and set ACI to null.
+   */
+  get rgbValue(): number | null {
+    return this._rgbValue;
+  }
+
+  set rgbValue(val: number | null) {
+    if (val === null) {
+      this._rgbValue = null;
+    } else {
+      this._rgbValue = val & 0xffffff;
+      this._aci = null;
+    }
+  }
+
+  /**
+   * Returns a deep copy of this color.
+   * @returns A new MTextColor instance with the same color state.
+   */
+  copy(): MTextColor {
+    const c = new MTextColor();
+    c._aci = this._aci;
+    c._rgbValue = this._rgbValue;
+    return c;
+  }
+
+  /**
+   * Returns a plain object for serialization.
+   * @returns An object with aci, rgb (tuple), and rgbValue (number or null).
+   */
+  toObject(): { aci: number | null; rgb: RGB | null; rgbValue: number | null } {
+    return { aci: this._aci, rgb: this.rgb, rgbValue: this._rgbValue };
+  }
+
+  /**
+   * Equality check for color.
+   * @param other The other MTextColor to compare.
+   * @returns True if both ACI and RGB values are equal.
+   */
+  equals(other: MTextColor): boolean {
+    return this._aci === other._aci && this._rgbValue === other._rgbValue;
+  }
+}
+
+/**
  * MText context class for managing text formatting state
  */
 export class MTextContext {
   private _stroke: number = 0;
   /** Whether to continue stroke formatting */
   continueStroke: boolean = false;
-  private _aci: number = 7;
-  /** RGB color value, or null if using ACI */
-  rgb: RGB | null = null;
+  /** Color (ACI or RGB) */
+  color: MTextColor = new MTextColor();
   /** Line alignment */
   align: MTextLineAlignment = MTextLineAlignment.BOTTOM;
   /** Font face properties */
@@ -1356,8 +1504,8 @@ export class MTextContext {
   /**
    * Get the ACI color value
    */
-  get aci(): number {
-    return this._aci;
+  get aci(): number | null {
+    return this.color.aci;
   }
 
   /**
@@ -1366,12 +1514,21 @@ export class MTextContext {
    * @throws Error if value is out of range
    */
   set aci(value: number) {
-    if (value >= 0 && value <= 256) {
-      this._aci = value;
-      this.rgb = null;
-    } else {
-      throw new Error('ACI not in range [0, 256]');
-    }
+    this.color.aci = value;
+  }
+
+  /**
+   * Get the RGB color value
+   */
+  get rgb(): RGB | null {
+    return this.color.rgb;
+  }
+
+  /**
+   * Set the RGB color value
+   */
+  set rgb(value: RGB | null) {
+    this.color.rgb = value;
   }
 
   /**
@@ -1447,8 +1604,7 @@ export class MTextContext {
     const ctx = new MTextContext();
     ctx._stroke = this._stroke;
     ctx.continueStroke = this.continueStroke;
-    ctx._aci = this._aci;
-    ctx.rgb = this.rgb;
+    ctx.color = this.color.copy();
     ctx.align = this.align;
     ctx.fontFace = { ...this.fontFace };
     ctx._capHeight = { ...this._capHeight };
