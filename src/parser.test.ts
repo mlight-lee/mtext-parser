@@ -1159,6 +1159,29 @@ describe('MTextParser', () => {
         weight: 700,
       });
     });
+
+    it('yields property change tokens for RGB color commands', () => {
+      // \c16711680 is 0xFF0000, which is [255,0,0] (red)
+      const parser = new MTextParser('\\c16711680Red Text', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'c',
+        changes: {
+          aci: null,
+          rgb: [255, 0, 0],
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Red');
+      expect(tokens[1].ctx.rgb).toEqual([255, 0, 0]);
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[2].ctx.rgb).toEqual([255, 0, 0]);
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Text');
+      expect(tokens[3].ctx.rgb).toEqual([255, 0, 0]);
+    });
   });
 });
 
