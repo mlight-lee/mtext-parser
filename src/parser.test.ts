@@ -1110,7 +1110,7 @@ describe('MTextParser', () => {
         true
       );
       const tokens = Array.from(parser.parse());
-      expect(tokens).toHaveLength(6);
+      expect(tokens).toHaveLength(7);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[0].data).toEqual({
         command: 'H',
@@ -1158,6 +1158,154 @@ describe('MTextParser', () => {
         style: 'Italic',
         weight: 700,
       });
+      expect(tokens[6].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[6].data).toEqual({
+        command: undefined,
+        changes: {
+          aci: 256,
+          capHeight: { value: 1, isRelative: false },
+          fontFace: { family: '', style: 'Regular', weight: 400 },
+        },
+      });
+    });
+  });
+
+  describe('MTextParser context restoration with braces {}', () => {
+    it('scopes font formatting to braces and restores after', () => {
+      const parser = new MTextParser('Normal {\\fArial|i;Italic} Back to normal');
+      const tokens = Array.from(parser.parse()).filter(t => t.type === TokenType.WORD);
+      expect(tokens[0].data).toBe('Normal');
+      expect(tokens[0].ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
+      expect(tokens[1].data).toBe('Italic');
+      expect(tokens[1].ctx.fontFace).toEqual({ family: 'Arial', style: 'Italic', weight: 400 });
+      expect(tokens[2].data).toBe('Back');
+      expect(tokens[2].ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
+    });
+
+    it('scopes color formatting to braces and restores after', () => {
+      const parser = new MTextParser('{\\C1;Red} Normal');
+      const tokens = Array.from(parser.parse()).filter(t => t.type === TokenType.WORD);
+      expect(tokens[0].data).toBe('Red');
+      expect(tokens[0].ctx.aci).toBe(1);
+      expect(tokens[1].data).toBe('Normal');
+      expect(tokens[1].ctx.aci).toBe(256); // default
+    });
+
+    it('restores previous formatting after a formatting block', () => {
+      const parser = new MTextParser('\\C2;Before {\\C1;Red} After');
+      const tokens = Array.from(parser.parse()).filter(t => t.type === TokenType.WORD);
+      expect(tokens[0].data).toBe('Before');
+      expect(tokens[0].ctx.aci).toBe(2);
+      expect(tokens[1].data).toBe('Red');
+      expect(tokens[1].ctx.aci).toBe(1);
+      expect(tokens[2].data).toBe('After');
+      expect(tokens[2].ctx.aci).toBe(2);
+    });
+
+    it('restores context correctly with nested braces', () => {
+      const parser = new MTextParser('{\\C1;Red {\\C2;Blue} RedAgain}');
+      const tokens = Array.from(parser.parse()).filter(t => t.type === TokenType.WORD);
+      expect(tokens[0].data).toBe('Red');
+      expect(tokens[0].ctx.aci).toBe(1);
+      expect(tokens[1].data).toBe('Blue');
+      expect(tokens[1].ctx.aci).toBe(2);
+      expect(tokens[2].data).toBe('RedAgain');
+      expect(tokens[2].ctx.aci).toBe(1);
+    });
+
+    it('persists formatting outside braces if not reset', () => {
+      const parser = new MTextParser('\\C3;All {\\C1;Red} StillAll');
+      const tokens = Array.from(parser.parse()).filter(t => t.type === TokenType.WORD);
+      expect(tokens[0].data).toBe('All');
+      expect(tokens[0].ctx.aci).toBe(3);
+      expect(tokens[1].data).toBe('Red');
+      expect(tokens[1].ctx.aci).toBe(1);
+      expect(tokens[2].data).toBe('StillAll');
+      expect(tokens[2].ctx.aci).toBe(3);
+    });
+  });
+
+  describe('MTextParser context restoration with braces {} and yieldPropertyCommands', () => {
+    it('yields property change tokens when entering and exiting a formatting block', () => {
+      const parser = new MTextParser('Normal {\\fArial|i;Italic} Back', undefined, true);
+      const tokens = Array.from(parser.parse());
+      // Filter for property changes and words
+      const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
+      const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
+      // Should yield a property change for entering Arial Italic
+      expect(propTokens[0].data).toEqual({
+        command: 'f',
+        changes: { fontFace: { family: 'Arial', style: 'Italic', weight: 400 } },
+      });
+      // Should yield a property change for restoring default font after block
+      expect(propTokens[propTokens.length - 1].data).toEqual({
+        command: undefined,
+        changes: { fontFace: { family: '', style: 'Regular', weight: 400 } },
+      });
+      // Check word tokens context
+      expect(wordTokens[0].data).toBe('Normal');
+      expect(wordTokens[0].ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
+      expect(wordTokens[1].data).toBe('Italic');
+      expect(wordTokens[1].ctx.fontFace).toEqual({ family: 'Arial', style: 'Italic', weight: 400 });
+      expect(wordTokens[2].data).toBe('Back');
+      expect(wordTokens[2].ctx.fontFace).toEqual({ family: '', style: 'Regular', weight: 400 });
+    });
+
+    it('yields property change tokens for color and restores after block', () => {
+      const parser = new MTextParser('{\\C1;Red} Normal', undefined, true);
+      const tokens = Array.from(parser.parse());
+      const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
+      const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
+      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 } });
+      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(wordTokens[0].data).toBe('Red');
+      expect(wordTokens[0].ctx.aci).toBe(1);
+      expect(wordTokens[1].data).toBe('Normal');
+      expect(wordTokens[1].ctx.aci).toBe(256);
+    });
+
+    it('yields property change tokens for nested braces', () => {
+      const parser = new MTextParser('{\\C1;Red {\\C2;Blue} RedAgain}', undefined, true);
+      const tokens = Array.from(parser.parse());
+      const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
+      const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
+      // Enter C1
+      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 } });
+      // Enter C2
+      expect(propTokens[1].data).toEqual({ command: 'C', changes: { aci: 2 } });
+      // Exit C2 (restore C1)
+      expect(propTokens[2].data).toEqual({ command: undefined, changes: { aci: 1 } });
+      // Exit C1 (restore default)
+      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(wordTokens[0].data).toBe('Red');
+      expect(wordTokens[0].ctx.aci).toBe(1);
+      expect(wordTokens[1].data).toBe('Blue');
+      expect(wordTokens[1].ctx.aci).toBe(2);
+      expect(wordTokens[2].data).toBe('RedAgain');
+      expect(wordTokens[2].ctx.aci).toBe(1);
+    });
+
+    it('yields property change tokens for RGB color commands', () => {
+      // \c16711680 is 0xFF0000, which is [255,0,0] (red)
+      const parser = new MTextParser('\\c16711680Red Text', undefined, true);
+      const tokens = Array.from(parser.parse());
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
+      expect(tokens[0].data).toEqual({
+        command: 'c',
+        changes: {
+          aci: null,
+          rgb: [255, 0, 0],
+        },
+      });
+      expect(tokens[1].type).toBe(TokenType.WORD);
+      expect(tokens[1].data).toBe('Red');
+      expect(tokens[1].ctx.rgb).toEqual([255, 0, 0]);
+      expect(tokens[2].type).toBe(TokenType.SPACE);
+      expect(tokens[2].ctx.rgb).toEqual([255, 0, 0]);
+      expect(tokens[3].type).toBe(TokenType.WORD);
+      expect(tokens[3].data).toBe('Text');
+      expect(tokens[3].ctx.rgb).toEqual([255, 0, 0]);
     });
   });
 });
