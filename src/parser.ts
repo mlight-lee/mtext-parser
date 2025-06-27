@@ -51,7 +51,10 @@ export interface Properties {
  * Changed properties of MText word tokens
  */
 export interface ChangedProperties {
-  command: string;
+  /**
+   * The command will be undefined if it is to restore context.
+   */
+  command: string | undefined;
   changes: Properties;
 }
 
@@ -121,13 +124,18 @@ export enum MTextStroke {
 export type RGB = [number, number, number];
 
 /**
+ * Font style type
+ */
+export type FontStyle = 'Regular' | 'Italic';
+
+/**
  * Font face properties
  */
 export interface FontFace {
   /** Font family name */
   family: string;
   /** Font style (e.g., 'Regular', 'Italic') */
-  style: string;
+  style: FontStyle;
   /** Font weight (e.g., 400 for normal, 700 for bold) */
   weight: number;
 }
@@ -816,14 +824,16 @@ export class MTextParser {
     const parts = this.extractExpression().split('|');
     if (parts.length > 0 && parts[0]) {
       const name = parts[0];
-      let style = 'Regular';
+      let style: FontStyle = 'Regular';
       let weight = 400;
 
       for (const part of parts.slice(1)) {
         if (part.startsWith('b1')) {
           weight = 700;
-        } else if (part.startsWith('i1')) {
+        } else if (part === 'i' || part.startsWith('i1')) {
           style = 'Italic';
+        } else if (part === 'i0' || part.startsWith('i0')) {
+          style = 'Regular';
         }
       }
 
@@ -1067,7 +1077,17 @@ export class MTextParser {
               return [wordToken, word];
             }
             this.scanner.consume(1);
-            this.popCtx();
+            // Context restoration with yieldPropertyCommands
+            if (this.yieldPropertyCommands) {
+              this.popCtx();
+              const changes = this.getPropertyChanges(this.lastCtx, this.ctx);
+              if (Object.keys(changes).length > 0) {
+                this.lastCtx = this.ctx.copy();
+                return [TokenType.PROPERTIES_CHANGED, { command: undefined, changes }];
+              }
+            } else {
+              this.popCtx();
+            }
             continue;
           }
         }
