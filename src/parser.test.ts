@@ -1257,7 +1257,10 @@ describe('MTextParser', () => {
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
       expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 } });
-      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(propTokens[propTokens.length - 1].data).toEqual({
+        command: undefined,
+        changes: { aci: 256 },
+      });
       expect(wordTokens[0].data).toBe('Red');
       expect(wordTokens[0].ctx.aci).toBe(1);
       expect(wordTokens[1].data).toBe('Normal');
@@ -1276,7 +1279,10 @@ describe('MTextParser', () => {
       // Exit C2 (restore C1)
       expect(propTokens[2].data).toEqual({ command: undefined, changes: { aci: 1 } });
       // Exit C1 (restore default)
-      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(propTokens[propTokens.length - 1].data).toEqual({
+        command: undefined,
+        changes: { aci: 256 },
+      });
       expect(wordTokens[0].data).toBe('Red');
       expect(wordTokens[0].ctx.aci).toBe(1);
       expect(wordTokens[1].data).toBe('Blue');
