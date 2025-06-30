@@ -48,14 +48,24 @@ export interface Properties {
 }
 
 /**
- * Changed properties of MText word tokens
+ * Represents a change in MText properties, including the command, the changed properties, and the context depth.
  */
 export interface ChangedProperties {
   /**
+   * The property command that triggered the change (e.g., 'L', 'C', 'f').
    * The command will be undefined if it is to restore context.
    */
   command: string | undefined;
+  /**
+   * The set of properties that have changed as a result of the command.
+   */
   changes: Properties;
+  /**
+   * The current context stack depth when the property change occurs.
+   * - 0: The change is global (applies outside of any `{}` block).
+   * - >0: The change is local (applies within one or more nested `{}` blocks).
+   */
+  depth: number; // 0 = global, >0 = local
 }
 
 /**
@@ -518,6 +528,7 @@ export class MTextParser {
         return {
           command: cmd,
           changes,
+          depth: this.ctxStack.length,
         };
       }
     }
@@ -1083,7 +1094,10 @@ export class MTextParser {
               const changes = this.getPropertyChanges(this.lastCtx, this.ctx);
               if (Object.keys(changes).length > 0) {
                 this.lastCtx = this.ctx.copy();
-                return [TokenType.PROPERTIES_CHANGED, { command: undefined, changes }];
+                return [
+                  TokenType.PROPERTIES_CHANGED,
+                  { command: undefined, changes, depth: this.ctxStack.length },
+                ];
               }
             } else {
               this.popCtx();
