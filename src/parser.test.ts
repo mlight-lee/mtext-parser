@@ -943,6 +943,7 @@ describe('MTextParser', () => {
         changes: {
           underline: true,
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Underlined');
@@ -953,6 +954,7 @@ describe('MTextParser', () => {
         changes: {
           underline: false,
         },
+        depth: 0,
       });
       expect(tokens[2].ctx.underline).toBe(false);
     });
@@ -967,6 +969,7 @@ describe('MTextParser', () => {
         changes: {
           aci: 1,
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Red');
@@ -992,6 +995,7 @@ describe('MTextParser', () => {
             weight: 700,
           },
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Bold');
@@ -1025,6 +1029,7 @@ describe('MTextParser', () => {
         changes: {
           capHeight: { value: 2.5, isRelative: false },
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Text');
@@ -1041,6 +1046,7 @@ describe('MTextParser', () => {
         changes: {
           capHeight: { value: 2.5, isRelative: false },
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[1].data).toEqual({
@@ -1048,6 +1054,7 @@ describe('MTextParser', () => {
         changes: {
           aci: 1,
         },
+        depth: 0,
       });
       expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[2].data).toEqual({
@@ -1055,6 +1062,7 @@ describe('MTextParser', () => {
         changes: {
           underline: true,
         },
+        depth: 0,
       });
       expect(tokens[3].type).toBe(TokenType.WORD);
       expect(tokens[3].data).toBe('Text');
@@ -1067,6 +1075,7 @@ describe('MTextParser', () => {
         changes: {
           underline: false,
         },
+        depth: 0,
       });
     });
 
@@ -1082,6 +1091,7 @@ describe('MTextParser', () => {
             indent: 2,
           },
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[1].data).toEqual({
@@ -1091,6 +1101,7 @@ describe('MTextParser', () => {
             align: MTextParagraphAlignment.CENTER,
           },
         },
+        depth: 0,
       });
       expect(tokens[2].type).toBe(TokenType.WORD);
       expect(tokens[2].data).toBe('Indented');
@@ -1117,6 +1128,7 @@ describe('MTextParser', () => {
         changes: {
           capHeight: { value: 2.5, isRelative: false },
         },
+        depth: 1,
       });
       expect(tokens[1].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[1].data).toEqual({
@@ -1124,6 +1136,7 @@ describe('MTextParser', () => {
         changes: {
           aci: 1,
         },
+        depth: 1,
       });
       expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[2].data).toEqual({
@@ -1135,6 +1148,7 @@ describe('MTextParser', () => {
             weight: 700,
           },
         },
+        depth: 1,
       });
       expect(tokens[3].type).toBe(TokenType.WORD);
       expect(tokens[3].data).toBe('Formatted');
@@ -1166,6 +1180,7 @@ describe('MTextParser', () => {
           capHeight: { value: 1, isRelative: false },
           fontFace: { family: '', style: 'Regular', weight: 400 },
         },
+        depth: 0,
       });
     });
   });
@@ -1236,11 +1251,13 @@ describe('MTextParser', () => {
       expect(propTokens[0].data).toEqual({
         command: 'f',
         changes: { fontFace: { family: 'Arial', style: 'Italic', weight: 400 } },
+        depth: 1,
       });
       // Should yield a property change for restoring default font after block
       expect(propTokens[propTokens.length - 1].data).toEqual({
         command: undefined,
         changes: { fontFace: { family: '', style: 'Regular', weight: 400 } },
+        depth: 0,
       });
       // Check word tokens context
       expect(wordTokens[0].data).toBe('Normal');
@@ -1256,8 +1273,12 @@ describe('MTextParser', () => {
       const tokens = Array.from(parser.parse());
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
-      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 } });
-      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 }, depth: 1 });
+      expect(propTokens[propTokens.length - 1].data).toEqual({
+        command: undefined,
+        changes: { aci: 256 },
+        depth: 0,
+      });
       expect(wordTokens[0].data).toBe('Red');
       expect(wordTokens[0].ctx.aci).toBe(1);
       expect(wordTokens[1].data).toBe('Normal');
@@ -1270,13 +1291,17 @@ describe('MTextParser', () => {
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
       // Enter C1
-      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 } });
+      expect(propTokens[0].data).toEqual({ command: 'C', changes: { aci: 1 }, depth: 1 });
       // Enter C2
-      expect(propTokens[1].data).toEqual({ command: 'C', changes: { aci: 2 } });
+      expect(propTokens[1].data).toEqual({ command: 'C', changes: { aci: 2 }, depth: 2 });
       // Exit C2 (restore C1)
-      expect(propTokens[2].data).toEqual({ command: undefined, changes: { aci: 1 } });
+      expect(propTokens[2].data).toEqual({ command: undefined, changes: { aci: 1 }, depth: 1 });
       // Exit C1 (restore default)
-      expect(propTokens[propTokens.length - 1].data).toEqual({ command: undefined, changes: { aci: 256 } });
+      expect(propTokens[propTokens.length - 1].data).toEqual({
+        command: undefined,
+        changes: { aci: 256 },
+        depth: 0,
+      });
       expect(wordTokens[0].data).toBe('Red');
       expect(wordTokens[0].ctx.aci).toBe(1);
       expect(wordTokens[1].data).toBe('Blue');
@@ -1297,6 +1322,7 @@ describe('MTextParser', () => {
           aci: null,
           rgb: [255, 0, 0],
         },
+        depth: 0,
       });
       expect(tokens[1].type).toBe(TokenType.WORD);
       expect(tokens[1].data).toBe('Red');
