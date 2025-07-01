@@ -358,7 +358,7 @@ export class MTextParser {
    * Push current context onto the stack
    */
   private pushCtx(): void {
-    this.ctxStack.push(this.ctx);
+    this.ctxStack.push(this.ctx.copy());
   }
 
   /**
