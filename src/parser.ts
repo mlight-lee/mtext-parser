@@ -298,15 +298,86 @@ export function getFonts(mtext: string, removeExtension: boolean = false) {
 }
 
 /**
+ * ContextStack manages a stack of MTextContext objects for character-level formatting.
+ *
+ * - Character-level formatting (underline, color, font, etc.) is scoped to `{}` blocks and managed by the stack.
+ * - Paragraph-level formatting (\p) is not scoped, but when a block ends, any paragraph property changes are merged into the parent context.
+ * - On pop, paragraph properties from the popped context are always merged into the new top context.
+ */
+class ContextStack {
+  private stack: MTextContext[] = [];
+
+  /**
+   * Creates a new ContextStack with an initial context.
+   * @param initial The initial MTextContext to use as the base of the stack.
+   */
+  constructor(initial: MTextContext) {
+    this.stack.push(initial.copy());
+  }
+
+  /**
+   * Pushes a copy of the given context onto the stack.
+   * @param ctx The MTextContext to push (copied).
+   */
+  push(ctx: MTextContext) {
+    this.stack.push(ctx.copy());
+  }
+
+  /**
+   * Pops the top context from the stack and merges its paragraph properties into the new top context.
+   * If only one context remains, nothing is popped.
+   * @returns The popped MTextContext, or undefined if the stack has only one context.
+   */
+  pop(): MTextContext | undefined {
+    if (this.stack.length <= 1) return undefined;
+    const popped = this.stack.pop()!;
+    // Merge paragraph properties into the new top context
+    const top = this.stack[this.stack.length - 1];
+    if (JSON.stringify(top.paragraph) !== JSON.stringify(popped.paragraph)) {
+      top.paragraph = { ...popped.paragraph };
+    }
+    return popped;
+  }
+
+  /**
+   * Returns the current (top) context on the stack.
+   */
+  get current(): MTextContext {
+    return this.stack[this.stack.length - 1];
+  }
+
+  /**
+   * Returns the current stack depth (number of nested blocks), not counting the root context.
+   */
+  get depth(): number {
+    return this.stack.length - 1;
+  }
+
+  /**
+   * Returns the root (bottom) context, which represents the global formatting state.
+   * Used for paragraph property application.
+   */
+  get root(): MTextContext {
+    return this.stack[0];
+  }
+
+  /**
+   * Replaces the current (top) context with the given context.
+   * @param ctx The new context to set as the current context.
+   */
+  setCurrent(ctx: MTextContext) {
+    this.stack[this.stack.length - 1] = ctx;
+  }
+}
+
+/**
  * Main parser class for MText content
  */
 export class MTextParser {
   private scanner: TextScanner;
-  private ctx: MTextContext;
-  private ctxStack: MTextContext[] = [];
+  private ctxStack: ContextStack;
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
-  private lastCtx: MTextContext;
   private inStackContext: boolean = false;
 
   /**
@@ -317,8 +388,8 @@ export class MTextParser {
    */
   constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
     this.scanner = new TextScanner(content);
-    this.ctx = ctx ?? new MTextContext();
-    this.lastCtx = this.ctx.copy();
+    const initialCtx = ctx ?? new MTextContext();
+    this.ctxStack = new ContextStack(initialCtx);
     this.yieldPropertyCommands = yieldPropertyCommands;
   }
 
@@ -358,16 +429,14 @@ export class MTextParser {
    * Push current context onto the stack
    */
   private pushCtx(): void {
-    this.ctxStack.push(this.ctx.copy());
+    this.ctxStack.push(this.ctxStack.current);
   }
 
   /**
    * Pop context from the stack
    */
   private popCtx(): void {
-    if (this.ctxStack.length > 0) {
-      this.ctx = this.ctxStack.pop()!;
-    }
+    this.ctxStack.pop();
   }
 
   /**
@@ -451,84 +520,93 @@ export class MTextParser {
    * @returns Property changes if yieldPropertyCommands is true and changes occurred
    */
   private parseProperties(cmd: string): TokenData[TokenType.PROPERTIES_CHANGED] | void {
-    const newCtx = this.ctx.copy();
-
-    switch (cmd) {
-      case 'L':
-        newCtx.underline = true;
-        this.continueStroke = true;
-        break;
-      case 'l':
-        newCtx.underline = false;
-        if (!newCtx.hasAnyStroke) {
-          this.continueStroke = false;
-        }
-        break;
-      case 'O':
-        newCtx.overline = true;
-        this.continueStroke = true;
-        break;
-      case 'o':
-        newCtx.overline = false;
-        if (!newCtx.hasAnyStroke) {
-          this.continueStroke = false;
-        }
-        break;
-      case 'K':
-        newCtx.strikeThrough = true;
-        this.continueStroke = true;
-        break;
-      case 'k':
-        newCtx.strikeThrough = false;
-        if (!newCtx.hasAnyStroke) {
-          this.continueStroke = false;
-        }
-        break;
-      case 'A':
-        this.parseAlign(newCtx);
-        break;
-      case 'C':
-        this.parseAciColor(newCtx);
-        break;
-      case 'c':
-        this.parseRgbColor(newCtx);
-        break;
-      case 'H':
-        this.parseHeight(newCtx);
-        break;
-      case 'W':
-        this.parseWidth(newCtx);
-        break;
-      case 'Q':
-        this.parseOblique(newCtx);
-        break;
-      case 'T':
-        this.parseCharTracking(newCtx);
-        break;
-      case 'p':
-        this.parseParagraphProperties(newCtx);
-        break;
-      case 'f':
-      case 'F':
-        this.parseFontProperties(newCtx);
-        break;
-      default:
-        throw new Error(`Unknown command: ${cmd}`);
+    // Paragraph property commands (\p) are not scoped to {} blocks and always apply to the whole paragraph.
+    // All property change tokens are yielded so the consumer can determine the last \p for each paragraph.
+    let newCtx: MTextContext;
+    const prevCtx = this.ctxStack.current.copy();
+    if (cmd === 'p') {
+      // Always apply paragraph properties to the root context (bottom of stack)
+      newCtx = this.ctxStack.root.copy();
+      this.parseParagraphProperties(newCtx);
+      // Update the root context and current context
+      this.ctxStack.root.paragraph = { ...newCtx.paragraph };
+      this.ctxStack.current.paragraph = { ...newCtx.paragraph };
+    } else {
+      newCtx = this.ctxStack.current.copy();
+      switch (cmd) {
+        case 'L':
+          newCtx.underline = true;
+          this.continueStroke = true;
+          break;
+        case 'l':
+          newCtx.underline = false;
+          if (!newCtx.hasAnyStroke) {
+            this.continueStroke = false;
+          }
+          break;
+        case 'O':
+          newCtx.overline = true;
+          this.continueStroke = true;
+          break;
+        case 'o':
+          newCtx.overline = false;
+          if (!newCtx.hasAnyStroke) {
+            this.continueStroke = false;
+          }
+          break;
+        case 'K':
+          newCtx.strikeThrough = true;
+          this.continueStroke = true;
+          break;
+        case 'k':
+          newCtx.strikeThrough = false;
+          if (!newCtx.hasAnyStroke) {
+            this.continueStroke = false;
+          }
+          break;
+        case 'A':
+          this.parseAlign(newCtx);
+          break;
+        case 'C':
+          this.parseAciColor(newCtx);
+          break;
+        case 'c':
+          this.parseRgbColor(newCtx);
+          break;
+        case 'H':
+          this.parseHeight(newCtx);
+          break;
+        case 'W':
+          this.parseWidth(newCtx);
+          break;
+        case 'Q':
+          this.parseOblique(newCtx);
+          break;
+        case 'T':
+          this.parseCharTracking(newCtx);
+          break;
+        case 'f':
+        case 'F':
+          this.parseFontProperties(newCtx);
+          break;
+        default:
+          throw new Error(`Unknown command: ${cmd}`);
+      }
     }
 
     // Update continueStroke based on current stroke state
     this.continueStroke = newCtx.hasAnyStroke;
     newCtx.continueStroke = this.continueStroke;
-    this.ctx = newCtx;
+    // Use setCurrent to replace the current context
+    this.ctxStack.setCurrent(newCtx);
 
     if (this.yieldPropertyCommands) {
-      const changes = this.getPropertyChanges(this.lastCtx, newCtx);
+      const changes = this.getPropertyChanges(prevCtx, newCtx);
       if (Object.keys(changes).length > 0) {
-        this.lastCtx = this.ctx.copy();
         return {
           command: cmd,
           changes,
-          depth: this.ctxStack.length,
+          depth: this.ctxStack.depth,
         };
       }
     }
@@ -1033,7 +1111,6 @@ export class MTextParser {
                   try {
                     const propertyChanges = this.parseProperties(cmd);
                     if (this.yieldPropertyCommands && propertyChanges) {
-                      this.lastCtx = this.ctx.copy();
                       return [TokenType.PROPERTIES_CHANGED, propertyChanges];
                     }
                     // After processing a property command, continue with normal parsing
@@ -1090,13 +1167,13 @@ export class MTextParser {
             this.scanner.consume(1);
             // Context restoration with yieldPropertyCommands
             if (this.yieldPropertyCommands) {
+              const prevCtx = this.ctxStack.current.copy();
               this.popCtx();
-              const changes = this.getPropertyChanges(this.lastCtx, this.ctx);
+              const changes = this.getPropertyChanges(prevCtx, this.ctxStack.current);
               if (Object.keys(changes).length > 0) {
-                this.lastCtx = this.ctx.copy();
                 return [
                   TokenType.PROPERTIES_CHANGED,
-                  { command: undefined, changes, depth: this.ctxStack.length },
+                  { command: undefined, changes, depth: this.ctxStack.depth },
                 ];
               }
             } else {
@@ -1153,9 +1230,9 @@ export class MTextParser {
     while (true) {
       const [type, data] = nextToken();
       if (type) {
-        yield new MTextToken(type, this.ctx, data);
+        yield new MTextToken(type, this.ctxStack.current, data);
         if (followupToken) {
-          yield new MTextToken(followupToken, this.ctx, null);
+          yield new MTextToken(followupToken, this.ctxStack.current, null);
           followupToken = null;
         }
       } else {
