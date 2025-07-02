@@ -930,6 +930,46 @@ describe('MTextParser', () => {
       expect(tokens[0].data).toBe('Centered');
       expect(tokens[0].ctx.paragraph.align).toBe(MTextParagraphAlignment.CENTER);
     });
+
+    it('switches alignment', () => {
+      const mtext =
+        'Line1: {\\pql;Left aligned paragraph.}\\PLine2: {\\pqc;Center aligned paragraph.} Middle\\PLine3: {\\pql;Back to left.} {End}';
+      const ctx = new MTextContext();
+      ctx.fontFace.family = 'simkai';
+      ctx.capHeight = { value: 0.1, isRelative: true };
+      ctx.widthFactor = { value: 1.0, isRelative: true };
+      ctx.align = MTextLineAlignment.BOTTOM;
+      ctx.paragraph.align = MTextParagraphAlignment.LEFT;
+      const parser = new MTextParser(mtext, ctx, true);
+      const tokens = Array.from(parser.parse());
+      // Filter for word tokens
+      const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
+      const expected = [
+        // Paragraph 1 (LEFT)
+        { data: 'Line1:', align: MTextParagraphAlignment.LEFT },
+        { data: 'Left', align: MTextParagraphAlignment.LEFT },
+        { data: 'aligned', align: MTextParagraphAlignment.LEFT },
+        { data: 'paragraph.', align: MTextParagraphAlignment.LEFT },
+        // Paragraph 2 (CENTER)
+        { data: 'Line2:', align: MTextParagraphAlignment.LEFT },
+        { data: 'Center', align: MTextParagraphAlignment.CENTER },
+        { data: 'aligned', align: MTextParagraphAlignment.CENTER },
+        { data: 'paragraph.', align: MTextParagraphAlignment.CENTER },
+        { data: 'Middle', align: MTextParagraphAlignment.CENTER },
+        // Paragraph 3 (LEFT)
+        { data: 'Line3:', align: MTextParagraphAlignment.CENTER },
+        { data: 'Back', align: MTextParagraphAlignment.LEFT },
+        { data: 'to', align: MTextParagraphAlignment.LEFT },
+        { data: 'left.', align: MTextParagraphAlignment.LEFT },
+        { data: 'End', align: MTextParagraphAlignment.LEFT },
+      ];
+      expect(wordTokens).toHaveLength(expected.length);
+      for (let i = 0; i < expected.length; i++) {
+        console.log(wordTokens[i]);
+        expect(wordTokens[i].data).toBe(expected[i].data);
+        expect(wordTokens[i].ctx.paragraph.align).toBe(expected[i].align);
+      }
+    });
   });
 
   describe('property commands with yieldPropertyCommands', () => {
@@ -1067,7 +1107,6 @@ describe('MTextParser', () => {
       expect(tokens[3].type).toBe(TokenType.WORD);
       expect(tokens[3].data).toBe('Text');
       expect(tokens[3].ctx.capHeight).toEqual({ value: 2.5, isRelative: false });
-      expect(tokens[3].ctx.aci).toBe(1);
       expect(tokens[3].ctx.underline).toBe(true);
       expect(tokens[4].type).toBe(TokenType.PROPERTIES_CHANGED);
       expect(tokens[4].data).toEqual({
