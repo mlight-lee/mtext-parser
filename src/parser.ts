@@ -312,7 +312,7 @@ class ContextStack {
    * @param initial The initial MTextContext to use as the base of the stack.
    */
   constructor(initial: MTextContext) {
-    this.stack.push(initial.copy());
+    this.stack.push(initial);
   }
 
   /**
@@ -320,7 +320,7 @@ class ContextStack {
    * @param ctx The MTextContext to push (copied).
    */
   push(ctx: MTextContext) {
-    this.stack.push(ctx.copy());
+    this.stack.push(ctx);
   }
 
   /**
@@ -520,78 +520,69 @@ export class MTextParser {
    * @returns Property changes if yieldPropertyCommands is true and changes occurred
    */
   private parseProperties(cmd: string): TokenData[TokenType.PROPERTIES_CHANGED] | void {
-    // Paragraph property commands (\p) are not scoped to {} blocks and always apply to the whole paragraph.
-    // All property change tokens are yielded so the consumer can determine the last \p for each paragraph.
-    let newCtx: MTextContext;
     const prevCtx = this.ctxStack.current.copy();
-    if (cmd === 'p') {
-      // Always apply paragraph properties to the root context (bottom of stack)
-      newCtx = this.ctxStack.root.copy();
-      this.parseParagraphProperties(newCtx);
-      // Update the root context and current context
-      this.ctxStack.root.paragraph = { ...newCtx.paragraph };
-      this.ctxStack.current.paragraph = { ...newCtx.paragraph };
-    } else {
-      newCtx = this.ctxStack.current.copy();
-      switch (cmd) {
-        case 'L':
-          newCtx.underline = true;
-          this.continueStroke = true;
-          break;
-        case 'l':
-          newCtx.underline = false;
-          if (!newCtx.hasAnyStroke) {
-            this.continueStroke = false;
-          }
-          break;
-        case 'O':
-          newCtx.overline = true;
-          this.continueStroke = true;
-          break;
-        case 'o':
-          newCtx.overline = false;
-          if (!newCtx.hasAnyStroke) {
-            this.continueStroke = false;
-          }
-          break;
-        case 'K':
-          newCtx.strikeThrough = true;
-          this.continueStroke = true;
-          break;
-        case 'k':
-          newCtx.strikeThrough = false;
-          if (!newCtx.hasAnyStroke) {
-            this.continueStroke = false;
-          }
-          break;
-        case 'A':
-          this.parseAlign(newCtx);
-          break;
-        case 'C':
-          this.parseAciColor(newCtx);
-          break;
-        case 'c':
-          this.parseRgbColor(newCtx);
-          break;
-        case 'H':
-          this.parseHeight(newCtx);
-          break;
-        case 'W':
-          this.parseWidth(newCtx);
-          break;
-        case 'Q':
-          this.parseOblique(newCtx);
-          break;
-        case 'T':
-          this.parseCharTracking(newCtx);
-          break;
-        case 'f':
-        case 'F':
-          this.parseFontProperties(newCtx);
-          break;
-        default:
-          throw new Error(`Unknown command: ${cmd}`);
-      }
+    const newCtx = this.ctxStack.current.copy();
+    switch (cmd) {
+      case 'L':
+        newCtx.underline = true;
+        this.continueStroke = true;
+        break;
+      case 'l':
+        newCtx.underline = false;
+        if (!newCtx.hasAnyStroke) {
+          this.continueStroke = false;
+        }
+        break;
+      case 'O':
+        newCtx.overline = true;
+        this.continueStroke = true;
+        break;
+      case 'o':
+        newCtx.overline = false;
+        if (!newCtx.hasAnyStroke) {
+          this.continueStroke = false;
+        }
+        break;
+      case 'K':
+        newCtx.strikeThrough = true;
+        this.continueStroke = true;
+        break;
+      case 'k':
+        newCtx.strikeThrough = false;
+        if (!newCtx.hasAnyStroke) {
+          this.continueStroke = false;
+        }
+        break;
+      case 'A':
+        this.parseAlign(newCtx);
+        break;
+      case 'C':
+        this.parseAciColor(newCtx);
+        break;
+      case 'c':
+        this.parseRgbColor(newCtx);
+        break;
+      case 'H':
+        this.parseHeight(newCtx);
+        break;
+      case 'W':
+        this.parseWidth(newCtx);
+        break;
+      case 'Q':
+        this.parseOblique(newCtx);
+        break;
+      case 'T':
+        this.parseCharTracking(newCtx);
+        break;
+      case 'p':
+        this.parseParagraphProperties(newCtx);
+        break;
+      case 'f':
+      case 'F':
+        this.parseFontProperties(newCtx);
+        break;
+      default:
+        throw new Error(`Unknown command: ${cmd}`);
     }
 
     // Update continueStroke based on current stroke state
@@ -1167,7 +1158,7 @@ export class MTextParser {
             this.scanner.consume(1);
             // Context restoration with yieldPropertyCommands
             if (this.yieldPropertyCommands) {
-              const prevCtx = this.ctxStack.current.copy();
+              const prevCtx = this.ctxStack.current;
               this.popCtx();
               const changes = this.getPropertyChanges(prevCtx, this.ctxStack.current);
               if (Object.keys(changes).length > 0) {
@@ -1230,9 +1221,9 @@ export class MTextParser {
     while (true) {
       const [type, data] = nextToken();
       if (type) {
-        yield new MTextToken(type, this.ctxStack.current, data);
+        yield new MTextToken(type, this.ctxStack.current.copy(), data);
         if (followupToken) {
-          yield new MTextToken(followupToken, this.ctxStack.current, null);
+          yield new MTextToken(followupToken, this.ctxStack.current.copy(), null);
           followupToken = null;
         }
       } else {
