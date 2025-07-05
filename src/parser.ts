@@ -171,47 +171,6 @@ export interface FontFace {
 }
 
 /**
- * Font measurement properties
- */
-export interface FontMeasurements {
-  /** Height of capital letters */
-  cap_height: number;
-  /** Baseline position */
-  baseline: number;
-  /** Bottom position */
-  bottom: number;
-  /** Top position */
-  top: number;
-  /** Total height of the font */
-  total_height: number;
-  /**
-   * Scale measurements by a factor
-   * @param factor - The scaling factor
-   * @returns New scaled measurements
-   */
-  scale(factor: number): FontMeasurements;
-}
-
-/**
- * Abstract font interface
- */
-export interface AbstractFont {
-  /**
-   * Calculate text width
-   * @param text - The text to measure
-   * @returns Width of the text
-   */
-  text_width(text: string): number;
-  /**
-   * Get width of a space character
-   * @returns Width of a space
-   */
-  space_width(): number;
-  /** Font measurements */
-  measurements: FontMeasurements;
-}
-
-/**
  * Paragraph properties
  */
 export interface ParagraphProperties {
@@ -224,7 +183,7 @@ export interface ParagraphProperties {
   /** Paragraph alignment */
   align: MTextParagraphAlignment;
   /** Tab stop positions and types */
-  tab_stops: (number | string)[];
+  tabs: (number | string)[];
 }
 
 /**
@@ -715,10 +674,8 @@ export class MTextParser {
       if (oldCtx.paragraph.right !== newCtx.paragraph.right) {
         changedProps.right = newCtx.paragraph.right;
       }
-      if (
-        JSON.stringify(oldCtx.paragraph.tab_stops) !== JSON.stringify(newCtx.paragraph.tab_stops)
-      ) {
-        changedProps.tab_stops = newCtx.paragraph.tab_stops;
+      if (JSON.stringify(oldCtx.paragraph.tabs) !== JSON.stringify(newCtx.paragraph.tabs)) {
+        changedProps.tabs = newCtx.paragraph.tabs;
       }
       if (Object.keys(changedProps).length > 0) {
         changes.paragraph = changedProps;
@@ -1053,7 +1010,7 @@ export class MTextParser {
       left,
       right,
       align,
-      tab_stops: tabStops,
+      tabs: tabStops,
     };
   }
 
@@ -1074,7 +1031,6 @@ export class MTextParser {
     const wordToken = TokenType.WORD;
     const spaceToken = TokenType.SPACE;
     let followupToken: TokenType | null = null;
-    const self = this;
 
     function resetParagraph(ctx: MTextContext): Partial<ParagraphProperties> {
       const prev = { ...ctx.paragraph };
@@ -1083,14 +1039,15 @@ export class MTextParser {
         left: 0,
         right: 0,
         align: MTextParagraphAlignment.DEFAULT,
-        tab_stops: [],
+        tabs: [],
       };
       const changed: Partial<ParagraphProperties> = {};
       if (prev.indent !== 0) changed.indent = 0;
       if (prev.left !== 0) changed.left = 0;
       if (prev.right !== 0) changed.right = 0;
-      if (prev.align !== MTextParagraphAlignment.DEFAULT) changed.align = MTextParagraphAlignment.DEFAULT;
-      if (JSON.stringify(prev.tab_stops) !== JSON.stringify([])) changed.tab_stops = [];
+      if (prev.align !== MTextParagraphAlignment.DEFAULT)
+        changed.align = MTextParagraphAlignment.DEFAULT;
+      if (JSON.stringify(prev.tabs) !== JSON.stringify([])) changed.tabs = [];
       return changed;
     }
 
@@ -1289,15 +1246,11 @@ export class MTextParser {
           const ctx = this.ctxStack.current;
           const changed = resetParagraph(ctx);
           if (this.yieldPropertyCommands && Object.keys(changed).length > 0) {
-            yield new MTextToken(
-              TokenType.PROPERTIES_CHANGED,
-              ctx.copy(),
-              {
-                command: undefined,
-                changes: { paragraph: changed },
-                depth: this.ctxStack.depth,
-              }
-            );
+            yield new MTextToken(TokenType.PROPERTIES_CHANGED, ctx.copy(), {
+              command: undefined,
+              changes: { paragraph: changed },
+              depth: this.ctxStack.depth,
+            });
           }
         }
         if (followupToken) {
@@ -1623,7 +1576,7 @@ export class MTextContext {
     left: 0,
     right: 0,
     align: MTextParagraphAlignment.DEFAULT,
-    tab_stops: [],
+    tabs: [],
   };
 
   /**
