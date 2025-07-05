@@ -1664,6 +1664,38 @@ export class MTextContext {
   }
 
   /**
+   * Gets whether the current text should be rendered in italic style.
+   * @returns {boolean} True if the font style is 'Italic', otherwise false.
+   */
+  get italic(): boolean {
+    return this.fontFace.style === 'Italic';
+  }
+  /**
+   * Sets whether the current text should be rendered in italic style.
+   * @param value - If true, sets the font style to 'Italic'; if false, sets it to 'Regular'.
+   */
+  set italic(value: boolean) {
+    this.fontFace.style = value ? 'Italic' : 'Regular';
+  }
+
+  /**
+   * Gets whether the current text should be rendered in bold style.
+   * This is primarily used for mesh fonts and affects font selection.
+   * @returns {boolean} True if the font weight is 700 or higher, otherwise false.
+   */
+  get bold(): boolean {
+    return (this.fontFace.weight || 400) >= 700;
+  }
+  /**
+   * Sets whether the current text should be rendered in bold style.
+   * This is primarily used for mesh fonts and affects font selection.
+   * @param value - If true, sets the font weight to 700; if false, sets it to 400.
+   */
+  set bold(value: boolean) {
+    this.fontFace.weight = value ? 700 : 400;
+  }
+
+  /**
    * Get whether text is underlined
    */
   get underline(): boolean {

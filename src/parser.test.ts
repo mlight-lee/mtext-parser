@@ -71,6 +71,44 @@ describe('MTextContext', () => {
       align: MTextParagraphAlignment.DEFAULT,
       tabs: [],
     });
+    expect(ctx.bold).toBe(false);
+    expect(ctx.italic).toBe(false);
+  });
+
+  describe('italic and bold properties', () => {
+    it('should default to italic = false and bold = false', () => {
+      expect(ctx.italic).toBe(false);
+      expect(ctx.bold).toBe(false);
+    });
+
+    it('should set and get italic property', () => {
+      ctx.italic = true;
+      expect(ctx.italic).toBe(true);
+      expect(ctx.fontFace.style).toBe('Italic');
+      ctx.italic = false;
+      expect(ctx.italic).toBe(false);
+      expect(ctx.fontFace.style).toBe('Regular');
+    });
+
+    it('should set and get bold property', () => {
+      ctx.bold = true;
+      expect(ctx.bold).toBe(true);
+      expect(ctx.fontFace.weight).toBe(700);
+      ctx.bold = false;
+      expect(ctx.bold).toBe(false);
+      expect(ctx.fontFace.weight).toBe(400);
+    });
+
+    it('should reflect changes to fontFace.style and fontFace.weight', () => {
+      ctx.fontFace.style = 'Italic';
+      expect(ctx.italic).toBe(true);
+      ctx.fontFace.style = 'Regular';
+      expect(ctx.italic).toBe(false);
+      ctx.fontFace.weight = 700;
+      expect(ctx.bold).toBe(true);
+      ctx.fontFace.weight = 400;
+      expect(ctx.bold).toBe(false);
+    });
   });
 
   describe('stroke properties', () => {
