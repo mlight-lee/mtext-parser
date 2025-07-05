@@ -149,11 +149,20 @@ const contextTokens = Array.from(contextParser.parse());
 // contextTokens will contain tokens with the specified context
 
 // Parsing with property commands
-const propertyParser = new MTextParser('\\C1;Red Text', undefined, true);
+const propertyParser = new MTextParser('\\C1;Red Text', undefined, { yieldPropertyCommands: true });
 const propertyTokens = Array.from(propertyParser.parse());
 // propertyTokens will contain:
 // - PROPERTIES_CHANGED token with the color command
 // - WORD token with "Red Text" and aci = 1
+
+// Parsing with paragraph reset after new paragraph
+const resetParser = new MTextParser('Line1\\PLine2', undefined, { yieldPropertyCommands: true, resetParagraphParameters: true });
+const resetTokens = Array.from(resetParser.parse());
+// resetTokens will contain:
+// - WORD token with "Line1"
+// - NEW_PARAGRAPH token
+// - PROPERTIES_CHANGED token with paragraph reset
+// - WORD token with "Line2"
 ```
 
 ### Token Types

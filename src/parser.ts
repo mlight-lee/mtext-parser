@@ -24,26 +24,46 @@ export enum TokenType {
   PROPERTIES_CHANGED = 9,
 }
 
+/**
+ * Represents a factor value that can be either absolute or relative.
+ * Used for properties like height, width, and character tracking in MText formatting.
+ */
 export interface FactorValue {
+  /** The numeric value of the factor */
   value: number;
+  /** Whether the value is relative (true) or absolute (false) */
   isRelative: boolean;
 }
 
 /**
- * Format properties of MText word tokens
+ * Format properties of MText word tokens.
+ * This interface defines all the formatting properties that can be applied to MText content,
+ * including text styling, colors, alignment, font properties, and paragraph formatting.
  */
 export interface Properties {
+  /** Whether text is underlined */
   underline?: boolean;
+  /** Whether text has an overline */
   overline?: boolean;
+  /** Whether text has strike-through */
   strikeThrough?: boolean;
+  /** AutoCAD Color Index (ACI) color value (0-256), or null if not set */
   aci?: number | null;
+  /** RGB color tuple [r, g, b], or null if not set */
   rgb?: RGB | null;
+  /** Line alignment for the text */
   align?: MTextLineAlignment;
+  /** Font face properties including family, style, and weight */
   fontFace?: FontFace;
+  /** Capital letter height factor (can be relative or absolute) */
   capHeight?: FactorValue;
+  /** Character width factor (can be relative or absolute) */
   widthFactor?: FactorValue;
+  /** Character tracking factor for spacing between characters (can be relative or absolute) */
   charTrackingFactor?: FactorValue;
+  /** Oblique angle in degrees for text slant */
   oblique?: number;
+  /** Paragraph formatting properties (partial to allow selective updates) */
   paragraph?: Partial<ParagraphProperties>;
 }
 
@@ -371,6 +391,27 @@ class ContextStack {
 }
 
 /**
+ * Configuration options for the MText parser.
+ * These options control how the parser behaves during tokenization and property handling.
+ */
+export interface MTextParserOptions {
+  /**
+   * Whether to yield PROPERTIES_CHANGED tokens when formatting properties change.
+   * When true, the parser will emit tokens whenever properties like color, font, or alignment change.
+   * When false, property changes are applied silently to the context without generating tokens.
+   * @default false
+   */
+  yieldPropertyCommands?: boolean;
+  /**
+   * Whether to reset paragraph parameters when encountering a new paragraph token.
+   * When true, paragraph properties (indent, margins, alignment, tab stops) are reset to defaults
+   * at the start of each new paragraph.
+   * @default false
+   */
+  resetParagraphParameters?: boolean;
+}
+
+/**
  * Main parser class for MText content
  */
 export class MTextParser {
@@ -378,19 +419,21 @@ export class MTextParser {
   private ctxStack: ContextStack;
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
+  private resetParagraphParameters: boolean;
   private inStackContext: boolean = false;
 
   /**
    * Creates a new MTextParser instance
    * @param content - The MText content to parse
    * @param ctx - Optional initial MText context
-   * @param yieldPropertyCommands - Whether to yield property change commands
+   * @param options - Parser options
    */
-  constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
+  constructor(content: string, ctx?: MTextContext, options: MTextParserOptions = {}) {
     this.scanner = new TextScanner(content);
     const initialCtx = ctx ?? new MTextContext();
     this.ctxStack = new ContextStack(initialCtx);
-    this.yieldPropertyCommands = yieldPropertyCommands;
+    this.yieldPropertyCommands = options.yieldPropertyCommands ?? false;
+    this.resetParagraphParameters = options.resetParagraphParameters ?? false;
   }
 
   /**
@@ -1031,6 +1074,25 @@ export class MTextParser {
     const wordToken = TokenType.WORD;
     const spaceToken = TokenType.SPACE;
     let followupToken: TokenType | null = null;
+    const self = this;
+
+    function resetParagraph(ctx: MTextContext): Partial<ParagraphProperties> {
+      const prev = { ...ctx.paragraph };
+      ctx.paragraph = {
+        indent: 0,
+        left: 0,
+        right: 0,
+        align: MTextParagraphAlignment.DEFAULT,
+        tab_stops: [],
+      };
+      const changed: Partial<ParagraphProperties> = {};
+      if (prev.indent !== 0) changed.indent = 0;
+      if (prev.left !== 0) changed.left = 0;
+      if (prev.right !== 0) changed.right = 0;
+      if (prev.align !== MTextParagraphAlignment.DEFAULT) changed.align = MTextParagraphAlignment.DEFAULT;
+      if (JSON.stringify(prev.tab_stops) !== JSON.stringify([])) changed.tab_stops = [];
+      return changed;
+    }
 
     const nextToken = (): [TokenType, TokenData[TokenType]] => {
       let word = '';
@@ -1219,9 +1281,25 @@ export class MTextParser {
     };
 
     while (true) {
-      const [type, data] = nextToken();
+      const [type, data] = nextToken.call(this);
       if (type) {
         yield new MTextToken(type, this.ctxStack.current.copy(), data);
+        if (type === TokenType.NEW_PARAGRAPH && this.resetParagraphParameters) {
+          // Reset paragraph properties and emit PROPERTIES_CHANGED if needed
+          const ctx = this.ctxStack.current;
+          const changed = resetParagraph(ctx);
+          if (this.yieldPropertyCommands && Object.keys(changed).length > 0) {
+            yield new MTextToken(
+              TokenType.PROPERTIES_CHANGED,
+              ctx.copy(),
+              {
+                command: undefined,
+                changes: { paragraph: changed },
+                depth: this.ctxStack.depth,
+              }
+            );
+          }
+        }
         if (followupToken) {
           yield new MTextToken(followupToken, this.ctxStack.current.copy(), null);
           followupToken = null;
