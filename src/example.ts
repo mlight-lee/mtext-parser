@@ -147,5 +147,5 @@ const customParser = new MTextParser('Text with custom context', customContext);
 processTokens(customParser, 'Custom Context');
 
 // Example of parsing with property commands
-const propertyParser = new MTextParser('\\C1;Red Text', undefined, true);
+const propertyParser = new MTextParser('\\C1;Red Text', undefined, { yieldPropertyCommands: true });
 processTokens(propertyParser, 'Property Commands');
