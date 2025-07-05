@@ -24,26 +24,46 @@ export enum TokenType {
   PROPERTIES_CHANGED = 9,
 }
 
+/**
+ * Represents a factor value that can be either absolute or relative.
+ * Used for properties like height, width, and character tracking in MText formatting.
+ */
 export interface FactorValue {
+  /** The numeric value of the factor */
   value: number;
+  /** Whether the value is relative (true) or absolute (false) */
   isRelative: boolean;
 }
 
 /**
- * Format properties of MText word tokens
+ * Format properties of MText word tokens.
+ * This interface defines all the formatting properties that can be applied to MText content,
+ * including text styling, colors, alignment, font properties, and paragraph formatting.
  */
 export interface Properties {
+  /** Whether text is underlined */
   underline?: boolean;
+  /** Whether text has an overline */
   overline?: boolean;
+  /** Whether text has strike-through */
   strikeThrough?: boolean;
+  /** AutoCAD Color Index (ACI) color value (0-256), or null if not set */
   aci?: number | null;
+  /** RGB color tuple [r, g, b], or null if not set */
   rgb?: RGB | null;
+  /** Line alignment for the text */
   align?: MTextLineAlignment;
+  /** Font face properties including family, style, and weight */
   fontFace?: FontFace;
+  /** Capital letter height factor (can be relative or absolute) */
   capHeight?: FactorValue;
+  /** Character width factor (can be relative or absolute) */
   widthFactor?: FactorValue;
+  /** Character tracking factor for spacing between characters (can be relative or absolute) */
   charTrackingFactor?: FactorValue;
+  /** Oblique angle in degrees for text slant */
   oblique?: number;
+  /** Paragraph formatting properties (partial to allow selective updates) */
   paragraph?: Partial<ParagraphProperties>;
 }
 
@@ -370,8 +390,24 @@ class ContextStack {
   }
 }
 
+/**
+ * Configuration options for the MText parser.
+ * These options control how the parser behaves during tokenization and property handling.
+ */
 export interface MTextParserOptions {
+  /**
+   * Whether to yield PROPERTIES_CHANGED tokens when formatting properties change.
+   * When true, the parser will emit tokens whenever properties like color, font, or alignment change.
+   * When false, property changes are applied silently to the context without generating tokens.
+   * @default false
+   */
   yieldPropertyCommands?: boolean;
+  /**
+   * Whether to reset paragraph parameters when encountering a new paragraph token.
+   * When true, paragraph properties (indent, margins, alignment, tab stops) are reset to defaults
+   * at the start of each new paragraph.
+   * @default false
+   */
   resetParagraphParameters?: boolean;
 }
 
