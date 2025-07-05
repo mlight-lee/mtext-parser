@@ -370,6 +370,11 @@ class ContextStack {
   }
 }
 
+export interface MTextParserOptions {
+  yieldPropertyCommands?: boolean;
+  resetParagraphParameters?: boolean;
+}
+
 /**
  * Main parser class for MText content
  */
@@ -378,19 +383,21 @@ export class MTextParser {
   private ctxStack: ContextStack;
   private continueStroke: boolean = false;
   private yieldPropertyCommands: boolean;
+  private resetParagraphParameters: boolean;
   private inStackContext: boolean = false;
 
   /**
    * Creates a new MTextParser instance
    * @param content - The MText content to parse
    * @param ctx - Optional initial MText context
-   * @param yieldPropertyCommands - Whether to yield property change commands
+   * @param options - Parser options
    */
-  constructor(content: string, ctx?: MTextContext, yieldPropertyCommands: boolean = false) {
+  constructor(content: string, ctx?: MTextContext, options: MTextParserOptions = {}) {
     this.scanner = new TextScanner(content);
     const initialCtx = ctx ?? new MTextContext();
     this.ctxStack = new ContextStack(initialCtx);
-    this.yieldPropertyCommands = yieldPropertyCommands;
+    this.yieldPropertyCommands = options.yieldPropertyCommands ?? false;
+    this.resetParagraphParameters = options.resetParagraphParameters ?? false;
   }
 
   /**
@@ -1031,6 +1038,25 @@ export class MTextParser {
     const wordToken = TokenType.WORD;
     const spaceToken = TokenType.SPACE;
     let followupToken: TokenType | null = null;
+    const self = this;
+
+    function resetParagraph(ctx: MTextContext): Partial<ParagraphProperties> {
+      const prev = { ...ctx.paragraph };
+      ctx.paragraph = {
+        indent: 0,
+        left: 0,
+        right: 0,
+        align: MTextParagraphAlignment.DEFAULT,
+        tab_stops: [],
+      };
+      const changed: Partial<ParagraphProperties> = {};
+      if (prev.indent !== 0) changed.indent = 0;
+      if (prev.left !== 0) changed.left = 0;
+      if (prev.right !== 0) changed.right = 0;
+      if (prev.align !== MTextParagraphAlignment.DEFAULT) changed.align = MTextParagraphAlignment.DEFAULT;
+      if (JSON.stringify(prev.tab_stops) !== JSON.stringify([])) changed.tab_stops = [];
+      return changed;
+    }
 
     const nextToken = (): [TokenType, TokenData[TokenType]] => {
       let word = '';
@@ -1219,9 +1245,25 @@ export class MTextParser {
     };
 
     while (true) {
-      const [type, data] = nextToken();
+      const [type, data] = nextToken.call(this);
       if (type) {
         yield new MTextToken(type, this.ctxStack.current.copy(), data);
+        if (type === TokenType.NEW_PARAGRAPH && this.resetParagraphParameters) {
+          // Reset paragraph properties and emit PROPERTIES_CHANGED if needed
+          const ctx = this.ctxStack.current;
+          const changed = resetParagraph(ctx);
+          if (this.yieldPropertyCommands && Object.keys(changed).length > 0) {
+            yield new MTextToken(
+              TokenType.PROPERTIES_CHANGED,
+              ctx.copy(),
+              {
+                command: undefined,
+                changes: { paragraph: changed },
+                depth: this.ctxStack.depth,
+              }
+            );
+          }
+        }
         if (followupToken) {
           yield new MTextToken(followupToken, this.ctxStack.current.copy(), null);
           followupToken = null;

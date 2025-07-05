@@ -713,19 +713,19 @@ describe('MTextParser', () => {
   describe('GBK character encoding', () => {
     it('decodes GBK hex codes', () => {
       // Test "你" (C4E3 in GBK)
-      let parser = new MTextParser('\\M+C4E3', undefined, false);
+      let parser = new MTextParser('\\M+C4E3', undefined, { yieldPropertyCommands: false });
       let tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('你');
 
       // Test "好" (BAC3 in GBK)
-      parser = new MTextParser('\\M+BAC3', undefined, false);
+      parser = new MTextParser('\\M+BAC3', undefined, { yieldPropertyCommands: false });
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('好');
 
       // Test multiple GBK characters
-      parser = new MTextParser('\\M+C4E3\\M+BAC3', undefined, false);
+      parser = new MTextParser('\\M+C4E3\\M+BAC3', undefined, { yieldPropertyCommands: false });
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('你');
@@ -735,19 +735,19 @@ describe('MTextParser', () => {
 
     it('handles invalid GBK codes', () => {
       // Test invalid hex code
-      let parser = new MTextParser('\\M+XXXX', undefined, false);
+      let parser = new MTextParser('\\M+XXXX', undefined, { yieldPropertyCommands: false });
       let tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('\\M+XXXX');
 
       // Test incomplete hex code
-      parser = new MTextParser('\\M+C4', undefined, false);
+      parser = new MTextParser('\\M+C4', undefined, { yieldPropertyCommands: false });
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('\\M+C4');
 
       // Test missing plus sign
-      parser = new MTextParser('\\MC4E3', undefined, false);
+      parser = new MTextParser('\\MC4E3', undefined, { yieldPropertyCommands: false });
       tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
       expect(tokens[0].data).toBe('\\MC4E3');
@@ -755,7 +755,7 @@ describe('MTextParser', () => {
 
     it('handles GBK characters with other formatting', () => {
       // Test GBK characters with height command
-      const parser = new MTextParser('\\H2.5;\\M+C4E3\\H.5x;\\M+BAC3', undefined, false);
+      const parser = new MTextParser('\\H2.5;\\M+C4E3\\H.5x;\\M+BAC3', undefined, { yieldPropertyCommands: false });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(2);
       expect(tokens[0].type).toBe(TokenType.WORD);
@@ -770,7 +770,7 @@ describe('MTextParser', () => {
       const parser = new MTextParser(
         '{\\fgbcbig.shx|b0|i0|c0|p0;\\M+C4E3\\M+BAC3}',
         undefined,
-        false
+        { yieldPropertyCommands: false }
       );
       const tokens = Array.from(parser.parse());
       expect(tokens[0].type).toBe(TokenType.WORD);
@@ -940,7 +940,7 @@ describe('MTextParser', () => {
       ctx.widthFactor = { value: 1.0, isRelative: true };
       ctx.align = MTextLineAlignment.BOTTOM;
       ctx.paragraph.align = MTextParagraphAlignment.LEFT;
-      const parser = new MTextParser(mtext, ctx, true);
+      const parser = new MTextParser(mtext, ctx, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       // Filter for word tokens
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
@@ -974,7 +974,7 @@ describe('MTextParser', () => {
 
   describe('property commands with yieldPropertyCommands', () => {
     it('yields property change tokens for formatting commands', () => {
-      const parser = new MTextParser('\\LUnderlined\\l', undefined, true);
+      const parser = new MTextParser('\\LUnderlined\\l', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(3);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1000,7 +1000,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for color commands', () => {
-      const parser = new MTextParser('\\C1Red Text', undefined, true);
+      const parser = new MTextParser('\\C1Red Text', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(4);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1022,7 +1022,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for font properties', () => {
-      const parser = new MTextParser('\\FArial|b1|i1;Bold Italic', undefined, true);
+      const parser = new MTextParser('\\FArial|b1|i1;Bold Italic', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(4);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1060,7 +1060,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for height command', () => {
-      const parser = new MTextParser('\\H2.5;Text', undefined, true);
+      const parser = new MTextParser('\\H2.5;Text', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(2);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1077,7 +1077,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for multiple commands', () => {
-      const parser = new MTextParser('\\H2.5;\\C1;\\LText\\l', undefined, true);
+      const parser = new MTextParser('\\H2.5;\\C1;\\LText\\l', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(5);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1119,7 +1119,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for paragraph properties', () => {
-      const parser = new MTextParser('\\pi2;\\pqc;Indented Centered', undefined, true);
+      const parser = new MTextParser('\\pi2;\\pqc;Indented Centered', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(5);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1157,7 +1157,7 @@ describe('MTextParser', () => {
       const parser = new MTextParser(
         '{\\H2.5;\\C1;\\FArial|b1|i1;Formatted Text}',
         undefined,
-        true
+        { yieldPropertyCommands: true }
       );
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(7);
@@ -1281,7 +1281,7 @@ describe('MTextParser', () => {
 
   describe('MTextParser context restoration with braces {} and yieldPropertyCommands', () => {
     it('yields property change tokens when entering and exiting a formatting block', () => {
-      const parser = new MTextParser('Normal {\\fArial|i;Italic} Back', undefined, true);
+      const parser = new MTextParser('Normal {\\fArial|i;Italic} Back', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       // Filter for property changes and words
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
@@ -1308,7 +1308,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for color and restores after block', () => {
-      const parser = new MTextParser('{\\C1;Red} Normal', undefined, true);
+      const parser = new MTextParser('{\\C1;Red} Normal', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
@@ -1325,7 +1325,7 @@ describe('MTextParser', () => {
     });
 
     it('yields property change tokens for nested braces', () => {
-      const parser = new MTextParser('{\\C1;Red {\\C2;Blue} RedAgain}', undefined, true);
+      const parser = new MTextParser('{\\C1;Red {\\C2;Blue} RedAgain}', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       const propTokens = tokens.filter(t => t.type === TokenType.PROPERTIES_CHANGED);
       const wordTokens = tokens.filter(t => t.type === TokenType.WORD);
@@ -1351,7 +1351,7 @@ describe('MTextParser', () => {
 
     it('yields property change tokens for RGB color commands', () => {
       // \c16711680 is 0xFF0000, which is [255,0,0] (red)
-      const parser = new MTextParser('\\c16711680Red Text', undefined, true);
+      const parser = new MTextParser('\\c16711680Red Text', undefined, { yieldPropertyCommands: true });
       const tokens = Array.from(parser.parse());
       expect(tokens).toHaveLength(4);
       expect(tokens[0].type).toBe(TokenType.PROPERTIES_CHANGED);
@@ -1372,6 +1372,73 @@ describe('MTextParser', () => {
       expect(tokens[3].data).toBe('Text');
       expect(tokens[3].ctx.rgb).toEqual([255, 0, 0]);
     });
+  });
+});
+
+describe('MTextParser resetParagraphParameters option', () => {
+  it('resets paragraph properties after NEW_PARAGRAPH when resetParagraphParameters is true', () => {
+    // Create a context with non-default paragraph properties
+    const ctx = new MTextContext();
+    ctx.paragraph.indent = 2;
+    ctx.paragraph.align = MTextParagraphAlignment.LEFT;
+    
+    const parser = new MTextParser('Line1\\PLine2', ctx, { yieldPropertyCommands: true, resetParagraphParameters: true });
+    const tokens = Array.from(parser.parse());
+    // Should emit: WORD(Line1), NEW_PARAGRAPH, PROPERTIES_CHANGED (reset), WORD(Line2)
+    expect(tokens[0].type).toBe(TokenType.WORD);
+    expect(tokens[0].data).toBe('Line1');
+    expect(tokens[1].type).toBe(TokenType.NEW_PARAGRAPH);
+    expect(tokens[2].type).toBe(TokenType.PROPERTIES_CHANGED);
+    const propChanged = tokens[2].data as import('./parser').ChangedProperties;
+    expect(propChanged.changes).toHaveProperty('paragraph');
+    expect(tokens[3].type).toBe(TokenType.WORD);
+    expect(tokens[3].data).toBe('Line2');
+  });
+
+  it('does not emit PROPERTIES_CHANGED after NEW_PARAGRAPH if resetParagraphParameters is false', () => {
+    // Create a context with non-default paragraph properties
+    const ctx = new MTextContext();
+    ctx.paragraph.indent = 2;
+    ctx.paragraph.align = MTextParagraphAlignment.CENTER;
+    
+    const parser = new MTextParser('Line1\\PLine2', ctx, { yieldPropertyCommands: true, resetParagraphParameters: false });
+    const tokens = Array.from(parser.parse());
+    // Should emit: WORD(Line1), NEW_PARAGRAPH, WORD(Line2)
+    expect(tokens[0].type).toBe(TokenType.WORD);
+    expect(tokens[0].data).toBe('Line1');
+    expect(tokens[1].type).toBe(TokenType.NEW_PARAGRAPH);
+    expect(tokens[2].type).toBe(TokenType.WORD);
+    expect(tokens[2].data).toBe('Line2');
+    expect(tokens.find(t => t.type === TokenType.PROPERTIES_CHANGED && t.data && (t.data as import('./parser').ChangedProperties).changes && (t.data as import('./parser').ChangedProperties).changes.paragraph)).toBeUndefined();
+  });
+
+  it('resets paragraph properties but does not emit PROPERTIES_CHANGED if yieldPropertyCommands is false', () => {
+    // Create a context with non-default paragraph properties
+    const ctx = new MTextContext();
+    ctx.paragraph.indent = 2;
+    ctx.paragraph.align = MTextParagraphAlignment.CENTER;
+    
+    const parser = new MTextParser('Line1\\PLine2', ctx, { yieldPropertyCommands: false, resetParagraphParameters: true });
+    const tokens = Array.from(parser.parse());
+    // Should emit: WORD(Line1), NEW_PARAGRAPH, WORD(Line2)
+    expect(tokens[0].type).toBe(TokenType.WORD);
+    expect(tokens[0].data).toBe('Line1');
+    expect(tokens[1].type).toBe(TokenType.NEW_PARAGRAPH);
+    expect(tokens[2].type).toBe(TokenType.WORD);
+    expect(tokens[2].data).toBe('Line2');
+    expect(tokens.find(t => t.type === TokenType.PROPERTIES_CHANGED && t.data && (t.data as import('./parser').ChangedProperties).changes && (t.data as import('./parser').ChangedProperties).changes.paragraph)).toBeUndefined();
+  });
+
+  it('does not emit PROPERTIES_CHANGED when using default context with resetParagraphParameters true', () => {
+    const parser = new MTextParser('Line1\\PLine2', undefined, { yieldPropertyCommands: true, resetParagraphParameters: true });
+    const tokens = Array.from(parser.parse());
+    // Should emit: WORD(Line1), NEW_PARAGRAPH, WORD(Line2) - no PROPERTIES_CHANGED because default context has default paragraph properties
+    expect(tokens[0].type).toBe(TokenType.WORD);
+    expect(tokens[0].data).toBe('Line1');
+    expect(tokens[1].type).toBe(TokenType.NEW_PARAGRAPH);
+    expect(tokens[2].type).toBe(TokenType.WORD);
+    expect(tokens[2].data).toBe('Line2');
+    expect(tokens.find(t => t.type === TokenType.PROPERTIES_CHANGED && t.data && (t.data as import('./parser').ChangedProperties).changes && (t.data as import('./parser').ChangedProperties).changes.paragraph)).toBeUndefined();
   });
 });
 
